@@ -28,4 +28,17 @@ class ClienteController extends Controller
 
         return redirect()->route('clientes.index')->with('success', 'Cliente creado correctamente.');
     }
+
+    public function quickStore(Request $request)
+    {
+        $validated = $request->validate([
+            'nombre'   => 'required|string|max:255',
+            'telefono' => 'nullable|string|max:20',
+            'email'    => 'nullable|email|max:255',
+        ]);
+
+        $cliente = Cliente::create(array_merge($validated, ['total_gastado' => 0]));
+
+        return response()->json(['success' => true, 'cliente' => $cliente]);
+    }
 }

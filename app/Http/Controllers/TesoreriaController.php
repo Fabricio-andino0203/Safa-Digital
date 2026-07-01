@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\CuentaFinanciera;
+use App\Models\MovimientoTesoreria;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class TesoreriaController extends Controller
+{
+    public function index()
+    {
+        $cuentas = CuentaFinanciera::all();
+        
+        $capitalNeto = $cuentas->sum('saldo_actual');
+        $totalBancos = $cuentas->where('tipo', 'banco')->sum('saldo_actual');
+        $totalEfectivo = $cuentas->where('tipo', 'efectivo')->sum('saldo_actual');
+
+        $inicioMes = now()->startOfMonth();
+        $finMes = now()->endOfMonth();
+
+        $ingresosMes = MovimientoTesoreria::where('tipo', 'ingreso')
+            ->whereBetween('created_at', [$inicioMes, $finMes])
+            ->sum('monto');
+
+        $egresosMes = MovimientoTesoreria::where('tipo', 'egreso')
+            ->whereBetween('created_at', [$inicioMes, $finMes])
+            ->sum('monto');
+
+        $gananciasMes = $ingresosMes - $egresosMes;
+
+        $movimientos = MovimientoTesoreria::with(['cuenta', 'usuario'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Calcular deudas por pagar (Compras en estado Valorizada)
+        $deudasPorPagar = \App\Models\Compra::where('estado', 'Valorizada')->sum('total');
+
+        // Calcular cuentas por cobrar (Pedidos activos con saldo pendiente)
+        $deudasPorCobrar = \App\Models\Pedido::where('saldo_pendiente', '>', 0)
+            ->whereNotIn('estado', ['Entregado', 'Cancelado'])
+            ->sum('saldo_pendiente');
+
+        return view('tesoreria.index', compact(
+            'cuentas', 
+            'capitalNeto', 
+            'totalBancos', 
+            'totalEfectivo', 
+            'gananciasMes', 
+            'movimientos',
+            'deudasPorPagar',
+            'deudasPorCobrar'
+        ));
+    }
+
+    public function registrarMovimiento(Request $request)
+    {
+        $request->validate([
+            'cuenta_id' => 'required|exists:cuenta_financieras,id',
+            'tipo'      => 'required|in:ingreso,egreso',
+            'monto'     => 'required|numeric|min:0.01',
+            'concepto'  => 'required|string|max:255',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $cuenta = CuentaFinanciera::findOrFail($request->cuenta_id);
+
+            MovimientoTesoreria::create([
+                'cuenta_id' => $request->cuenta_id,
+                'tipo'      => $request->tipo,
+                'monto'     => $request->monto,
+                'concepto'  => $request->concepto,
+                'usuario_id'=> Auth::id() ?? 1,
+            ]);
+
+            if ($request->tipo === 'ingreso') {
+                $cuenta->increment('saldo_actual', $request->monto);
+            } else {
+                $cuenta->decrement('saldo_actual', $request->monto);
+            }
+
+            DB::commit();
+
+            $label = $request->tipo === 'ingreso' ? 'Depósito' : 'Retiro';
+            return redirect()->route('tesoreria.index')->with('success', "{$label} registrado con éxito por L. " . number_format($request->monto, 2));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error al registrar el movimiento: ' . $e->getMessage())->withInput();
+        }
+    }
+}

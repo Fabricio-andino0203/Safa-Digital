@@ -13,17 +13,23 @@ return new class extends Migration
     {
         Schema::create('pedidos', function (Blueprint $table) {
             $table->id();
+            $table->string('numero_orden', 20)->unique();
             $table->foreignId('cliente_id')->constrained('clientes')->onDelete('cascade');
+            
+            $table->enum('prioridad', ['Normal', 'Urgente', 'Alta Prioridad'])->default('Normal');
             $table->enum('estado', [
-                'Pendiente', 'Diseño', 'Aprobación', 'Producción', 'Listo', 'Entregado', 'Cancelado'
+                'Pendiente', 'Diseño', 'Esperando Aprobación', 'Producción', 
+                'Pausado', 'Listo para Entrega', 'Entregado', 'Cancelado'
             ])->default('Pendiente');
             
-            // Finanzas simples sin créditos
-            $table->decimal('total', 10, 2)->default(0);
-            $table->decimal('adelanto', 10, 2)->default(0);
-            $table->decimal('saldo', 10, 2)->default(0); // Se calculará: total - adelanto
+            // Finanzas
+            $table->decimal('subtotal', 10, 2)->default(0);
+            $table->decimal('descuento', 10, 2)->default(0);
+            $table->decimal('total_pedido', 10, 2)->default(0);
+            $table->decimal('total_abonado', 10, 2)->default(0);
+            $table->decimal('saldo_pendiente', 10, 2)->default(0);
             
-            $table->date('fecha_entrega')->nullable();
+            $table->date('fecha_estimada_entrega')->nullable();
             $table->text('notas')->nullable();
             $table->timestamps();
         });

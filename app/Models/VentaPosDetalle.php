@@ -14,8 +14,9 @@ class VentaPosDetalle extends Model
 
     protected $fillable = [
         'venta_pos_id',
-        'producto_id',
-        'nombre_producto',   // snapshot del nombre al momento de vender
+        'variante_id',
+        'nombre_snapshot',  // Snapshot del nombre completo: "Camisa Oversize — Negro / M"
+        'sku_snapshot',     // Snapshot del SKU: "CAM-NEG-M"
         'cantidad',
         'precio_unitario',
         'descuento_linea',
@@ -39,11 +40,11 @@ class VentaPosDetalle extends Model
     }
 
     /**
-     * Relación al producto real (puede ser null si el producto fue eliminado).
-     * Siempre consultar 'nombre_producto' del detalle para reportes históricos.
+     * Variante vendida (puede ser null si fue eliminada).
+     * SIEMPRE usar nombre_snapshot / sku_snapshot para reportes históricos.
      */
-    public function producto(): BelongsTo
+    public function variante(): BelongsTo
     {
-        return $this->belongsTo(Producto::class);
+        return $this->belongsTo(ProductoVariante::class, 'variante_id');
     }
 }

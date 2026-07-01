@@ -30,7 +30,7 @@
             <h3 class="text-sm font-medium text-neutral-500">Mejor Cliente (Por volumen de compra)</h3>
             <div class="mt-4 flex flex-col sm:flex-row sm:items-baseline gap-2">
                 <span class="text-4xl font-bold text-neutral-900">{{ $mejorCliente->nombre ?? 'N/A' }}</span>
-                <span class="text-neutral-500 font-medium">con un gasto total de <span class="text-green-600 font-bold">${{ number_format($mejorCliente->total_gastado ?? 0, 2) }}</span></span>
+                <span class="text-neutral-500 font-medium">con un gasto total de <span class="text-green-600 font-bold"> L.{{ number_format($mejorCliente->total_gastado ?? 0, 2) }}</span></span>
             </div>
         </div>
     </div>
@@ -53,8 +53,7 @@
                         <td class="px-6 py-4 text-neutral-900 font-medium">{{ $cliente->nombre }}</td>
                         <td class="px-6 py-4 text-neutral-500">{{ $cliente->telefono ?? '-' }}</td>
                         <td class="px-6 py-4 text-neutral-500">{{ $cliente->email ?? '-' }}</td>
-                        <td class="px-6 py-4 text-right font-bold text-neutral-900">
-                            ${{ number_format($cliente->total_gastado, 2) }}
+                        <td class="px-6 py-4 text-right font-bold text-neutral-900"> L.{{ number_format($cliente->total_gastado, 2) }}
                         </td>
                     </tr>
                     @empty

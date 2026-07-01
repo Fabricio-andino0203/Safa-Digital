@@ -15,10 +15,11 @@ return new class extends Migration
         Schema::create('caja_sesiones', function (Blueprint $table) {
             $table->id();
 
-            // El operador que abre el turno
+            // El operador que abre el turno (nullable: funciona sin autenticación activa)
             $table->foreignId('usuario_id')
+                  ->nullable()
                   ->constrained('users')
-                  ->onDelete('cascade');
+                  ->onDelete('set null');
 
             // Control del turno
             $table->enum('estado', ['abierta', 'cerrada'])->default('abierta');

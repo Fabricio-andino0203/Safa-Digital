@@ -23,7 +23,7 @@
         <div class="bg-white p-6 border border-neutral-100 rounded-2xl shadow-sm flex flex-col justify-between">
             <h3 class="text-sm font-medium text-neutral-500">Total Depósitos (Hoy)</h3>
             <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-4xl font-bold text-neutral-900">${{ number_format($totalIngresos ?? 0, 2) }}</span>
+                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($totalIngresos ?? 0, 2) }}</span>
             </div>
         </div>
 
@@ -32,7 +32,7 @@
             <div class="absolute right-0 top-0 w-2 h-full bg-green-500"></div>
             <h3 class="text-sm font-medium text-neutral-500">Efectivo en Mano</h3>
             <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-4xl font-bold text-neutral-900">${{ number_format($balanceEfectivo ?? 0, 2) }}</span>
+                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($balanceEfectivo ?? 0, 2) }}</span>
             </div>
         </div>
 
@@ -41,7 +41,7 @@
             <div class="absolute right-0 top-0 w-2 h-full bg-blue-500"></div>
             <h3 class="text-sm font-medium text-neutral-500">Saldo en Bancos</h3>
             <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-4xl font-bold text-neutral-900">${{ number_format($balanceBancos ?? 0, 2) }}</span>
+                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($balanceBancos ?? 0, 2) }}</span>
             </div>
         </div>
     </div>
@@ -59,6 +59,7 @@
                         <th class="px-6 py-4 font-medium border-b border-neutral-100">Concepto</th>
                         <th class="px-6 py-4 font-medium border-b border-neutral-100">Método</th>
                         <th class="px-6 py-4 font-medium border-b border-neutral-100 text-right">Monto</th>
+                        <th class="px-6 py-4 font-medium border-b border-neutral-100 text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 bg-white">
@@ -72,12 +73,18 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 text-right font-bold {{ $movimiento->tipo == 'ingreso' ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $movimiento->tipo == 'ingreso' ? '+' : '-' }} ${{ number_format($movimiento->monto, 2) }}
+                            {{ $movimiento->tipo == 'ingreso' ? '+' : '-' }} L. {{ number_format($movimiento->monto, 2) }}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <a href="{{ route('caja.ticket', $movimiento->id) }}" target="_blank" class="text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-1 text-sm font-medium">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                Ticket
+                            </a>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="4" class="px-6 py-8 text-center text-neutral-500">No hay movimientos registrados hoy.</td>
+                        <td colspan="5" class="px-6 py-8 text-center text-neutral-500">No hay movimientos registrados hoy.</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -126,7 +133,7 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-neutral-900">Monto ($)</label>
+                            <label class="block text-sm font-medium text-neutral-900">Monto (L.)</label>
                             <input type="number" step="0.01" x-model="form.monto" required class="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm shadow-sm transition-colors">
                         </div>
 
@@ -166,8 +173,30 @@
                     this.form.metodo = 'Bancos';
                 }
             },
-            submitMovimiento() {
-                // Fetch al backend
+            async submitMovimiento() {
+                try {
+                    const res = await fetch('{{ route('caja.store') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(this.form)
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        this.openModal = false;
+                        if (data.ticket_url) {
+                            window.open(data.ticket_url, '_blank');
+                        }
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Error al registrar el movimiento.');
+                    }
+                } catch(e) {
+                    alert('Error de conexión al servidor.');
+                }
             }
         }
     }

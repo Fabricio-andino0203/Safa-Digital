@@ -19,7 +19,22 @@ class CajaController extends Controller
         $totalEgresos = $movimientosHoy->where('tipo', 'egreso')->sum('monto');
         $balance = $totalIngresos - $totalEgresos;
 
-        return view('caja.index', compact('movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance'));
+        // Cálculos contables globales históricos
+        $todosMovimientos = CajaMovimiento::all();
+
+        $balanceEfectivo = $todosMovimientos->filter(function($m) {
+            return $m->tipo === 'ingreso' && strtolower($m->referencia) === 'efectivo';
+        })->sum('monto') - $todosMovimientos->filter(function($m) {
+            return $m->tipo === 'egreso' && strtolower($m->referencia) === 'efectivo';
+        })->sum('monto');
+
+        $balanceBancos = $todosMovimientos->filter(function($m) {
+            return $m->tipo === 'ingreso' && in_array(strtolower($m->referencia), ['bancos', 'tarjeta', 'transferencia']);
+        })->sum('monto') - $todosMovimientos->filter(function($m) {
+            return $m->tipo === 'egreso';
+        })->sum('monto');
+
+        return view('caja.index', compact('movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance', 'balanceEfectivo', 'balanceBancos'));
     }
 
     public function store(Request $request)
@@ -28,12 +43,32 @@ class CajaController extends Controller
             'tipo' => 'required|in:ingreso,egreso',
             'monto' => 'required|numeric|min:0.01',
             'concepto' => 'required|string|max:255',
-            'referencia' => 'nullable|string|max:255',
-            'fecha' => 'required|date'
+            'metodo' => 'nullable|string|max:255',
         ]);
 
-        $movimiento = CajaMovimiento::create($validated);
+        $movimiento = CajaMovimiento::create([
+            'tipo' => $validated['tipo'],
+            'monto' => $validated['monto'],
+            'concepto' => $validated['concepto'],
+            'referencia' => $validated['tipo'] === 'egreso' ? 'Bancos' : ($validated['metodo'] ?? 'Efectivo'),
+            'fecha' => now()->toDateString(),
+        ]);
 
-        return response()->json(['success' => true, 'movimiento' => $movimiento]);
+        return response()->json([
+            'success' => true,
+            'movimiento' => $movimiento,
+            'ticket_url' => route('caja.ticket', $movimiento->id)
+        ]);
+    }
+
+    public function descargarTicket($id)
+    {
+        ini_set('memory_limit', '512M');
+        $movimiento = CajaMovimiento::with('pedido')->findOrFail($id);
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.ticket_caja', compact('movimiento'));
+        $pdf->setPaper([0, 0, 226.77, 800], 'portrait');
+
+        return $pdf->stream('ticket_caja_' . $movimiento->id . '.pdf');
     }
 }

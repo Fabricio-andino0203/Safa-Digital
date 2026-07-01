@@ -55,7 +55,7 @@
                         <span class="text-lg">{{ $labelMetodos[$metodo]['icon'] ?? '💰' }}</span>
                         <span class="text-sm font-medium text-neutral-700">{{ $labelMetodos[$metodo]['label'] ?? ucfirst($metodo) }}</span>
                     </div>
-                    <span class="text-base font-bold text-neutral-900">${{ number_format($monto, 2) }}</span>
+                    <span class="text-base font-bold text-neutral-900"> L.{{ number_format($monto, 2) }}</span>
                 </div>
                 @empty
                 <div class="px-6 py-8 text-center text-neutral-400 text-sm">
@@ -73,19 +73,19 @@
             <div class="divide-y divide-neutral-50">
                 <div class="flex justify-between px-6 py-4">
                     <span class="text-sm text-neutral-500">Monto Inicial (Apertura)</span>
-                    <span class="text-sm font-medium text-neutral-900">${{ number_format($sesion->monto_inicial, 2) }}</span>
+                    <span class="text-sm font-medium text-neutral-900"> L.{{ number_format($sesion->monto_inicial, 2) }}</span>
                 </div>
                 <div class="flex justify-between px-6 py-4">
                     <span class="text-sm text-neutral-500">Total Ventas del Turno</span>
-                    <span class="text-sm font-medium text-green-600">+${{ number_format($totalVentas, 2) }}</span>
+                    <span class="text-sm font-medium text-green-600">+L.{{ number_format($totalVentas, 2) }}</span>
                 </div>
                 <div class="flex justify-between px-6 py-4">
                     <span class="text-sm text-neutral-500">Retiros / Egresos del Turno</span>
-                    <span class="text-sm font-medium text-red-500">−${{ number_format($retiros, 2) }}</span>
+                    <span class="text-sm font-medium text-red-500">−L.{{ number_format($retiros, 2) }}</span>
                 </div>
                 <div class="flex justify-between px-6 py-5 bg-neutral-50">
                     <span class="text-base font-bold text-neutral-900">Total Esperado en Caja</span>
-                    <span class="text-xl font-bold text-neutral-900">${{ number_format($totalEsperado, 2) }}</span>
+                    <span class="text-xl font-bold text-neutral-900"> L.{{ number_format($totalEsperado, 2) }}</span>
                 </div>
             </div>
         </div>
@@ -98,9 +98,9 @@
             </div>
             <div class="p-6 space-y-5">
                 <div>
-                    <label class="block text-sm font-semibold text-neutral-700 mb-2">Monto Contado Físicamente ($)</label>
+                    <label class="block text-sm font-semibold text-neutral-700 mb-2">Monto Contado Físicamente (L.)</label>
                     <div class="relative">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 font-medium">$</span>
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 font-medium"> L.</span>
                         <input
                             type="number"
                             x-model.number="montoContado"
@@ -136,7 +136,7 @@
                     </div>
                     <span class="text-3xl font-bold"
                           :class="diferencia >= 0 ? 'text-green-700' : 'text-red-700'"
-                          x-text="(diferencia >= 0 ? '+' : '') + '$' + Math.abs(diferencia).toFixed(2)">
+                          x-text="(diferencia >= 0 ? '+' : '') + 'L.' + Math.abs(diferencia).toFixed(2)">
                     </span>
                 </div>
 
@@ -146,7 +146,7 @@
                     <textarea
                         x-model="notas"
                         rows="3"
-                        placeholder="Ej. Billete de $500 falso detectado, cliente devolvió producto..."
+                        placeholder="Ej. Billete de L.500 falso detectado, cliente devolvió producto..."
                         class="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm text-neutral-900 focus:outline-none focus:border-neutral-400 bg-neutral-50 transition-colors resize-none"
                     ></textarea>
                 </div>
@@ -189,7 +189,7 @@
                         </span>
                     </div>
                     <div class="text-right">
-                        <span class="text-sm font-bold text-neutral-900">${{ number_format($venta->total, 2) }}</span>
+                        <span class="text-sm font-bold text-neutral-900"> L.{{ number_format($venta->total, 2) }}</span>
                         <span class="block text-xs text-neutral-400">{{ $venta->created_at->format('H:i') }}</span>
                     </div>
                 </div>

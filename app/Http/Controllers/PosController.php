@@ -5,8 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\CajaSesion;
 use App\Models\CajaMovimiento;
 use App\Models\Producto;
+use App\Models\ProductoVariante;
 use App\Models\VentaPos;
 use App\Models\VentaPosDetalle;
+use App\Models\CuentaFinanciera;
+use App\Models\MovimientoTesoreria;
+use App\Models\CorteCaja;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,32 +23,79 @@ class PosController extends Controller
 
     /**
      * Carga la pantalla principal del POS.
-     * Si no hay sesión abierta, muestra el modal de apertura bloqueando el POS.
+     * Envía los productos con sus variantes activas para el selector en Alpine.
      */
     public function index()
     {
         $sesion = CajaSesion::sesionAbierta();
 
-        // Carga productos activos con stock > 0 para el grid del POS
-        $productos = Producto::where('tipo', 'producto')
-            ->where('stock', '>', 0)
-            ->orderBy('nombre')
-            ->get(['id', 'nombre', 'precio', 'stock', 'sku']);
+        // Cargamos productos activos con variantes activas que tengan stock disponible.
+        // Estructura para Alpine: array de productos, cada uno con sus variantes.
+        $productos = Producto::with(['categoria', 'variantes' => function ($q) {
+            $q->where('activo', true)->orderBy('sku');
+        }])
+        ->where('activo', true)
+        ->whereHas('variantes', function ($q) {
+            $q->where('activo', true)->whereRaw('(stock_fisico - stock_reservado) > 0');
+        })
+        ->orderBy('nombre')
+        ->get()
+        ->map(function ($producto) {
+            return [
+                'id'       => $producto->id,
+                'nombre'   => $producto->nombre,
+                'categoria'=> $producto->categoria?->nombre ?? 'Sin categoría',
+                'imagen'   => $producto->imagen,
+                'variantes'=> $producto->variantes->map(function ($v) {
+                    return [
+                        'id'               => $v->id,
+                        'sku'              => $v->sku,
+                        'nombre_completo'  => $v->nombre_completo,
+                        'atributos'        => $v->atributos ?? [],
+                        'precio'           => (float) $v->precio,
+                        'stock_disponible' => $v->stock_disponible,
+                        'imagen'           => $v->imagen,
+                    ];
+                })->values(),
+            ];
+        });
 
-        return view('pos.index', compact('sesion', 'productos'));
+        // ── 3. Cargar Pedidos Pendientes para el Modal de Liquidación ─────────────
+        $pedidosPendientes = \App\Models\Pedido::with('cliente')
+            ->where('saldo_pendiente', '>', 0)
+            ->whereNotIn('estado', ['Entregado', 'Cancelado'])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function($pedido) {
+                return [
+                    'numero_orden'    => $pedido->numero_orden,
+                    'cliente'         => $pedido->cliente ? $pedido->cliente->nombre : 'Venta de Mostrador',
+                    'saldo_pendiente' => (float) $pedido->saldo_pendiente,
+                    'total_pedido'    => (float) $pedido->total_pedido,
+                ];
+            });
+
+        $clientes = \App\Models\Cliente::orderBy('nombre')->get();
+
+        // Calcular dinero esperado en caja
+        $dineroEsperado = 0;
+        if ($sesion) {
+            $ventasEfectivo = $sesion->ventas()->where('estado', 'completada')->where('metodo_pago', 'efectivo')->sum('total');
+            $retiros = CajaMovimiento::where('tipo', 'egreso')
+                ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
+                ->sum('monto');
+            $dineroEsperado = $sesion->monto_inicial + $ventasEfectivo - $retiros;
+        }
+
+        return view('pos.index', compact('sesion', 'productos', 'pedidosPendientes', 'clientes', 'dineroEsperado'));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
     // GESTIÓN DE SESIÓN
     // ══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Abre un nuevo turno de caja.
-     * Solo puede haber UNA sesión abierta a la vez.
-     */
     public function abrirSesion(Request $request)
     {
-        // Validación: no abrir si ya hay una sesión activa
         if (CajaSesion::sesionAbierta()) {
             return response()->json([
                 'success' => false,
@@ -57,7 +108,7 @@ class PosController extends Controller
         ]);
 
         $sesion = CajaSesion::create([
-            'usuario_id'     => Auth::id() ?? 1, // Fallback mientras no hay auth completo
+            'usuario_id'     => Auth::id() ?? 1,
             'estado'         => 'abierta',
             'monto_inicial'  => $request->monto_inicial,
             'fecha_apertura' => now(),
@@ -71,88 +122,96 @@ class PosController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // BÚSQUEDA DE PRODUCTOS (Endpoint AJAX para Alpine.js)
+    // BÚSQUEDA DE VARIANTES (Endpoint AJAX)
     // ══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Busca productos por nombre o SKU.
-     * Retorna JSON — llamado reactivamente desde Alpine sin recargar la página.
+     * Busca variantes por nombre de producto, SKU o atributos.
+     * Retorna datos enriquecidos para el selector del POS.
      */
     public function buscarProductos(Request $request)
     {
         $query = $request->get('q', '');
 
-        $productos = Producto::where('tipo', 'producto')
-            ->where('stock', '>', 0)
+        $variantes = ProductoVariante::with('producto')
+            ->where('activo', true)
+            ->whereRaw('(stock_fisico - stock_reservado) > 0')
             ->where(function ($q) use ($query) {
-                $q->where('nombre', 'LIKE', "%{$query}%")
-                  ->orWhere('sku', 'LIKE', "%{$query}%");
+                $q->where('sku', 'LIKE', "%{$query}%")
+                  ->orWhereHas('producto', function ($qp) use ($query) {
+                      $qp->where('nombre', 'LIKE', "%{$query}%");
+                  });
             })
-            ->orderBy('nombre')
+            ->orderBy('sku')
             ->limit(30)
-            ->get(['id', 'nombre', 'precio', 'stock', 'sku']);
+            ->get()
+            ->map(fn($v) => [
+                'id'              => $v->id,
+                'sku'             => $v->sku,
+                'nombre_completo' => $v->nombre_completo,
+                'atributos'       => $v->atributos ?? [],
+                'precio'          => (float) $v->precio,
+                'stock_disponible'=> $v->stock_disponible,
+                'imagen'          => $v->imagen,
+            ]);
 
-        return response()->json($productos);
+        return response()->json($variantes);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // PROCESAR COBRO (La operación más crítica del sistema)
+    // PROCESAR COBRO
     // ══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Procesa el cobro de un carrito completo.
+     * Procesa el cobro de un carrito. Ahora trabaja con variante_id.
      *
-     * Integración con Inventario: descuenta stock de cada producto vendido.
-     * Integración con Tesorería:  registra el ingreso en caja_movimientos.
-     *
-     * Todo ocurre dentro de una transacción DB — si algo falla, se revierte todo.
+     * Integración Inventario: descuenta stock_fisico directamente (venta POS = sin reserva).
+     * Integración Tesorería:  registra ingreso en caja_movimientos.
      */
     public function procesarVenta(Request $request)
     {
         $request->validate([
-            'caja_sesion_id'  => 'required|exists:caja_sesiones,id',
-            'carrito'         => 'required|array|min:1',
-            'carrito.*.id'    => 'required|exists:productos,id',
-            'carrito.*.qty'   => 'required|integer|min:1',
-            'descuento'       => 'nullable|numeric|min:0',
-            'metodo_pago'     => 'required|in:efectivo,transferencia,tarjeta,mixto',
-            'monto_entregado' => 'nullable|numeric|min:0',
-            'cliente_id'      => 'nullable|exists:clientes,id',
-            'notas'           => 'nullable|string|max:500',
+            'caja_sesion_id'      => 'required|exists:caja_sesiones,id',
+            'carrito'             => 'required|array|min:1',
+            'carrito.*.id'        => 'required|exists:producto_variantes,id',
+            'carrito.*.qty'       => 'required|integer|min:1',
+            'descuento'           => 'nullable|numeric|min:0',
+            'metodo_pago'         => 'required|in:efectivo,transferencia,tarjeta,mixto',
+            'monto_entregado'     => 'nullable|numeric|min:0',
+            'cliente_id'          => 'nullable|exists:clientes,id',
+            'notas'               => 'nullable|string|max:500',
         ]);
 
         try {
             DB::beginTransaction();
 
-            // ── 1. Verificar sesión abierta ───────────────────────────────────
             $sesion = CajaSesion::findOrFail($request->caja_sesion_id);
             if ($sesion->estado !== 'abierta') {
                 throw new \Exception('La sesión de caja está cerrada. No se pueden procesar ventas.');
             }
 
-            // ── 2. Calcular montos ────────────────────────────────────────────
-            $subtotal  = 0;
+            // ── 1. Validar stock y calcular montos ────────────────────────────
+            $subtotal    = 0;
             $itemsValidos = [];
 
             foreach ($request->carrito as $item) {
-                $producto = Producto::lockForUpdate()->findOrFail($item['id']);
+                $variante = ProductoVariante::lockForUpdate()->findOrFail($item['id']);
 
-                // Verificar stock suficiente
-                if ($producto->stock < $item['qty']) {
+                if ($variante->stock_disponible < $item['qty']) {
                     throw new \Exception(
-                        "Stock insuficiente para '{$producto->nombre}'. Disponible: {$producto->stock}"
+                        "Stock insuficiente para '{$variante->nombre_completo}'. " .
+                        "Disponible: {$variante->stock_disponible}"
                     );
                 }
 
-                $precioUnitario = $producto->precio;
-                $linea = $precioUnitario * $item['qty'];
+                $linea     = $variante->precio * $item['qty'];
                 $subtotal += $linea;
 
                 $itemsValidos[] = [
-                    'producto'       => $producto,
-                    'cantidad'       => $item['qty'],
-                    'precio_unitario'=> $precioUnitario,
-                    'subtotal'       => $linea,
+                    'variante' => $variante,
+                    'cantidad' => $item['qty'],
+                    'precio'   => (float) $variante->precio,
+                    'linea'    => $linea,
                 ];
             }
 
@@ -164,10 +223,18 @@ class PosController extends Controller
                 $cambio = $request->monto_entregado - $total;
             }
 
-            // ── 3. Crear el ticket de venta ───────────────────────────────────
+            // ── 2. Crear ticket ───────────────────────────────────────────────
+            $clienteId = $request->cliente_id;
+            if ($request->filled('pedido_id')) {
+                $p = \App\Models\Pedido::find($request->pedido_id);
+                if ($p) {
+                    $clienteId = $p->cliente_id;
+                }
+            }
+
             $venta = VentaPos::create([
                 'caja_sesion_id'  => $sesion->id,
-                'cliente_id'      => $request->cliente_id,
+                'cliente_id'      => $clienteId ?: null,
                 'subtotal'        => $subtotal,
                 'descuento'       => $descuento,
                 'total'           => $total,
@@ -178,31 +245,31 @@ class PosController extends Controller
                 'notas'           => $request->notas,
             ]);
 
-            // ── 4. Crear detalles y descontar stock (INTEGRACIÓN INVENTARIO) ──
+            // ── 3. Crear detalles y descontar stock ───────────────────────────
             foreach ($itemsValidos as $item) {
                 VentaPosDetalle::create([
-                    'venta_pos_id'    => $venta->id,
-                    'producto_id'     => $item['producto']->id,
-                    'nombre_producto' => $item['producto']->nombre, // snapshot histórico
-                    'cantidad'        => $item['cantidad'],
-                    'precio_unitario' => $item['precio_unitario'],
-                    'descuento_linea' => 0,
-                    'subtotal'        => $item['subtotal'],
+                    'venta_pos_id'   => $venta->id,
+                    'variante_id'    => $item['variante']->id,
+                    'nombre_snapshot'=> $item['variante']->nombre_completo,
+                    'sku_snapshot'   => $item['variante']->sku,
+                    'cantidad'       => $item['cantidad'],
+                    'precio_unitario'=> $item['precio'],
+                    'descuento_linea'=> 0,
+                    'subtotal'       => $item['linea'],
                 ]);
 
-                // ✅ Descuento de stock en tiempo real
-                $item['producto']->decrement('stock', $item['cantidad']);
+                // ✅ Venta directa: descuenta solo stock_fisico (sin reserva)
+                $item['variante']->venderDirecto($item['cantidad']);
             }
 
-            // ── 5. Registrar en Tesorería (INTEGRACIÓN CAJA_MOVIMIENTOS) ──────
-            // Regla: el ingreso va a la cuenta que corresponde al método de pago
-            CajaMovimiento::create([
-                'tipo'      => 'ingreso',      // → Depósito (según terminología UI)
-                'monto'     => $total,
-                'concepto'  => 'Venta POS #' . $venta->id,
-                'referencia'=> strtoupper($request->metodo_pago),
-                'pedido_id' => null,
-                'fecha'     => now()->toDateString(),
+            // ── 4. Registrar en Tesorería ─────────────────────────────────────
+            $movimiento = CajaMovimiento::create([
+                'tipo'       => 'ingreso',
+                'monto'      => $total,
+                'concepto'   => 'Venta POS #' . $venta->id,
+                'referencia' => strtoupper($request->metodo_pago),
+                'pedido_id'  => null,
+                'fecha'      => now()->toDateString(),
             ]);
 
             DB::commit();
@@ -211,39 +278,177 @@ class PosController extends Controller
                 'success' => true,
                 'venta'   => $venta->load('detalles'),
                 'cambio'  => $cambio,
-                'message' => 'Venta procesada correctamente.'
+                'message' => 'Venta procesada correctamente.',
+                'ticket_url' => route('pos.ticket', $venta->id),
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
 
+    public function ticketVenta($id)
+    {
+        ini_set('memory_limit', '512M');
+        $venta = VentaPos::with(['cliente', 'detalles'])->findOrFail($id);
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.ticket_pos_80mm', compact('venta'));
+        $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+
+        return $pdf->stream('ticket_venta_' . $venta->id . '.pdf');
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
-    // CORTE DE CAJA (Vista resumen antes de cerrar)
+    // INTEGRACIÓN CON PEDIDOS
     // ══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Muestra la pantalla de Corte de Caja con el resumen del turno.
-     */
+    public function buscarPedido(Request $request)
+    {
+        $numero_orden = $request->get('numero_orden');
+        $pedido = \App\Models\Pedido::with('cliente', 'detalles')
+            ->where('numero_orden', $numero_orden)
+            ->first();
+
+        if (!$pedido) {
+            return response()->json(['success' => false, 'message' => 'Pedido no encontrado.'], 404);
+        }
+
+        return response()->json(['success' => true, 'pedido' => $pedido]);
+    }
+
+    public function pagarPedido(Request $request)
+    {
+        $request->validate([
+            'caja_sesion_id'  => 'required|exists:caja_sesiones,id',
+            'pedido_id'       => 'required|exists:pedidos,id',
+            'monto_entregado' => 'nullable|numeric|min:0',
+            'metodo_pago'     => 'required|in:efectivo,transferencia,tarjeta,mixto',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $sesion = CajaSesion::findOrFail($request->caja_sesion_id);
+            if ($sesion->estado !== 'abierta') {
+                throw new \Exception('La sesión de caja está cerrada.');
+            }
+
+            $pedido = \App\Models\Pedido::with('detalles.variante')->findOrFail($request->pedido_id);
+
+            if ($pedido->saldo_pendiente <= 0) {
+                throw new \Exception('Este pedido ya está pagado en su totalidad.');
+            }
+
+            $monto_a_cobrar = $pedido->saldo_pendiente;
+            $cambio = null;
+
+            if ($request->metodo_pago === 'efectivo' && $request->monto_entregado !== null) {
+                if ($request->monto_entregado >= $monto_a_cobrar) {
+                    $cambio = $request->monto_entregado - $monto_a_cobrar;
+                    $monto_pagado = $monto_a_cobrar;
+                } else {
+                    $cambio = 0;
+                    $monto_pagado = $request->monto_entregado;
+                }
+            } else {
+                $monto_pagado = $monto_a_cobrar;
+            }
+
+            if ($monto_pagado <= 0) {
+                throw new \Exception('El monto a pagar debe ser mayor a 0.');
+            }
+
+            // Actualizar pedido
+            $pedido->total_abonado += $monto_pagado;
+            $pedido->saldo_pendiente -= $monto_pagado;
+            
+            // Lógica de inventario (descontar stock físico y liberar reserva) al Entregar
+            if ($pedido->saldo_pendiente <= 0 && $pedido->estado !== 'Entregado') {
+                foreach ($pedido->detalles as $detalle) {
+                    if ($detalle->tipo_producto === 'Inventario' && $detalle->variante) {
+                        $detalle->variante->confirmarEntrega($detalle->cantidad);
+                    }
+                }
+                $pedido->estado = 'Entregado';
+            }
+            
+            $pedido->save();
+
+            // Registrar ingreso en tesorería
+            $movimiento = CajaMovimiento::create([
+                'caja_sesion_id' => $sesion->id,
+                'tipo'       => 'ingreso',
+                'monto'      => $monto_pagado,
+                'concepto'   => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden,
+                'referencia' => strtoupper($request->metodo_pago),
+                'pedido_id'  => $pedido->id,
+                'fecha'      => now()->toDateString(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'pedido'  => $pedido,
+                'cambio'  => $cambio,
+                'ticket_url' => route('pago.ticket', $movimiento->id),
+                'message' => 'Pedido cobrado y marcado como Entregado.'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function descargarTicketPago($id)
+    {
+        ini_set('memory_limit', '512M');
+        $pago = CajaMovimiento::with('pedido.cliente')->findOrFail($id);
+        
+        $pedido = $pago->pedido;
+        $tipo = 'Abono';
+        $saldoAnterior = 0;
+        $saldoActual = 0;
+        
+        if ($pedido) {
+            $saldoActual = $pedido->saldo_pendiente;
+            // El saldo anterior era el saldo actual mas el monto de esta transaccion
+            $saldoAnterior = $saldoActual + $pago->monto;
+            if ($saldoActual <= 0) {
+                $tipo = 'Liquidación';
+            }
+        }
+        
+        try {
+            $qrCode = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(0)->generate(route('pedidos.track', $pedido->numero_orden)));
+        } catch (\Exception $e) {
+            $qrCode = null;
+        }
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.ticket_pago_80mm', compact('pago', 'pedido', 'tipo', 'saldoAnterior', 'saldoActual', 'qrCode'));
+        $pdf->setPaper([0, 0, 226.77, 600], 'portrait');
+
+        return $pdf->stream('recibo_pago_'.$pago->id.'.pdf');
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CORTE DE CAJA
+    // ══════════════════════════════════════════════════════════════════════════
+
     public function corteCaja()
     {
         $sesion = CajaSesion::sesionAbierta();
 
         if (!$sesion) {
-            return redirect()->route('pos.index')
-                ->with('error', 'No hay una sesión de caja abierta.');
+            return redirect()->route('pos.index')->with('error', 'No hay una sesión de caja abierta.');
         }
 
         $ventas          = $sesion->ventas()->where('estado', 'completada')->get();
         $totalVentas     = $ventas->sum('total');
         $ventasPorMetodo = $sesion->ventasPorMetodo();
 
-        // Retiros (egresos) registrados durante este turno (por fecha)
         $retiros = CajaMovimiento::where('tipo', 'egreso')
             ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
             ->sum('monto');
@@ -251,31 +456,20 @@ class PosController extends Controller
         $totalEsperado = $sesion->monto_inicial + $totalVentas - $retiros;
 
         return view('pos.corte', compact(
-            'sesion',
-            'ventas',
-            'totalVentas',
-            'ventasPorMetodo',
-            'retiros',
-            'totalEsperado'
+            'sesion', 'ventas', 'totalVentas', 'ventasPorMetodo', 'retiros', 'totalEsperado'
         ));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // CERRAR SESIÓN (Cierre oficial del turno)
+    // CERRAR SESIÓN
     // ══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Cierra la sesión de caja.
-     * Calcula la diferencia entre lo esperado y el conteo físico.
-     * NO registra el total en caja_movimientos aquí — ya se registra
-     * en procesarVenta() por cada transacción individual.
-     */
     public function cerrarSesion(Request $request)
     {
         $request->validate([
-            'caja_sesion_id'      => 'required|exists:caja_sesiones,id',
-            'monto_contado_fisico'=> 'required|numeric|min:0',
-            'notas'               => 'nullable|string|max:1000',
+            'caja_sesion_id'       => 'required|exists:caja_sesiones,id',
+            'monto_contado_fisico' => 'required|numeric|min:0',
+            'notas'                => 'nullable|string|max:1000',
         ]);
 
         try {
@@ -287,8 +481,8 @@ class PosController extends Controller
                 throw new \Exception('Esta sesión ya fue cerrada anteriormente.');
             }
 
-            $totalVentas   = $sesion->totalVentas();
-            $retiros       = CajaMovimiento::where('tipo', 'egreso')
+            $totalVentas = $sesion->totalVentas();
+            $retiros     = CajaMovimiento::where('tipo', 'egreso')
                 ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
                 ->sum('monto');
 
@@ -315,10 +509,109 @@ class PosController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function cerrarCaja(Request $request)
+    {
+        $request->validate([
+            'caja_sesion_id'       => 'required|exists:caja_sesiones,id',
+            'monto_contado_fisico' => 'required|numeric|min:0',
+            'monto_a_retirar'      => 'required|numeric|min:0',
+            'notas'                => 'nullable|string|max:1000',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $sesion = CajaSesion::findOrFail($request->caja_sesion_id);
+            if ($sesion->estado === 'cerrada') {
+                throw new \Exception('Esta sesión ya fue cerrada.');
+            }
+
+            // 1. Obtener totales de la sesión
+            $ventasEfectivo = $sesion->ventas()
+                ->where('estado', 'completada')
+                ->where('metodo_pago', 'efectivo')
+                ->sum('total');
+
+            $retiros = CajaMovimiento::where('tipo', 'egreso')
+                ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
+                ->sum('monto');
+
+            // Dinero esperado = inicial + ventas efectivo - retiros
+            $montoFinalEsperado = $sesion->monto_inicial + $ventasEfectivo - $retiros;
+            $diferencia = $request->monto_contado_fisico - $montoFinalEsperado;
+
+            // El monto retirado a tesorería se descuenta de la caja. Lo restante queda como fondo inicial siguiente.
+            $montoRestante = max(0, $request->monto_contado_fisico - $request->monto_a_retirar);
+
+            // Actualizar la sesión
+            $sesion->update([
+                'estado'               => 'cerrada',
+                'fecha_cierre'         => now(),
+                'monto_final_esperado' => $montoFinalEsperado,
+                'monto_contado_fisico' => $montoRestante, // El fondo que se queda en caja para la siguiente sesión
+                'diferencia'           => $diferencia,
+                'notas'                => trim(($request->notas ?? '') . " | Corte. Arqueo físico: L. " . number_format($request->monto_contado_fisico, 2) . " | Retiro Tesorería: L. " . number_format($request->monto_a_retirar, 2) . " | Remanente: L. " . number_format($montoRestante, 2)),
+            ]);
+
+            // 2. Registrar el movimiento en la Tesorería (Caja Fuerte / Tesorería)
+            $cuentaTesoreria = CuentaFinanciera::where('nombre', 'Caja Fuerte / Tesorería')->first();
+            if (!$cuentaTesoreria) {
+                $cuentaTesoreria = CuentaFinanciera::where('tipo', 'efectivo')->first();
+            }
+
+            if ($cuentaTesoreria && $request->monto_a_retirar > 0) {
+                MovimientoTesoreria::create([
+                    'cuenta_id' => $cuentaTesoreria->id,
+                    'tipo' => 'ingreso', // Guardado como ingreso en DB
+                    'monto' => $request->monto_a_retirar,
+                    'concepto' => "Corte de caja de " . ($sesion->usuario->name ?? 'Cajero') . " - " . now()->format('d/m/Y'),
+                    'referencia_modulo' => 'POS-Corte-Caja',
+                    'usuario_id' => Auth::id() ?? 1,
+                ]);
+
+                $cuentaTesoreria->increment('saldo_actual', $request->monto_a_retirar);
+            }
+
+            // 3. Registrar el egreso de la caja del POS
+            if ($request->monto_a_retirar > 0) {
+                CajaMovimiento::create([
+                    'tipo' => 'egreso',
+                    'monto' => $request->monto_a_retirar,
+                    'concepto' => 'Retiro por Corte de Caja hacia Tesorería',
+                    'referencia' => 'Efectivo',
+                    'fecha' => now()->toDateString(),
+                ]);
+            }
+
+            // 4. Registrar la auditoría del corte de caja
+            CorteCaja::create([
+                'usuario_id'       => $sesion->usuario_id ?? Auth::id() ?? 1,
+                'fecha_apertura'   => $sesion->fecha_apertura,
+                'fecha_cierre'     => now(),
+                'fondo_inicial'    => $sesion->monto_inicial,
+                'ventas_efectivo'  => $ventasEfectivo,
+                'total_esperado'   => $montoFinalEsperado,
+                'efectivo_real'    => $request->monto_contado_fisico,
+                'diferencia'       => $diferencia,
+                'retiro_tesoreria' => $request->monto_a_retirar,
+                'notas'            => $request->notas,
+            ]);
+
+            DB::commit();
+
             return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 422);
+                'success' => true,
+                'monto_restante' => $montoRestante,
+                'message' => 'Cierre / Corte de caja procesado con éxito.',
+                'redirect' => route('pos.index'),
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
 }

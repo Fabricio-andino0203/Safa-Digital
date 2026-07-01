@@ -24,43 +24,69 @@
         }
     </script>
 </head>
-<body class="bg-[#FAFAFA] font-sans text-neutral-900 antialiased min-h-screen flex items-center justify-center">
+<body class="bg-gray-50 font-sans text-gray-900 antialiased min-h-screen flex items-center justify-center p-4">
 
-    <!-- Contenedor Central Minimalista (Estilo Linear / Vercel) -->
-    <div class="w-full max-w-sm bg-white p-8 border border-neutral-100 rounded-2xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
+    <!-- Tarjeta Central Premium (Estilo Notion / Linear) -->
+    <div class="w-full max-w-sm bg-white p-8 rounded-2xl border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         
-        <!-- Branding -->
+        <!-- Branding y Logo -->
         <div class="mb-8 text-center">
-            <h1 class="text-xl font-bold tracking-tight text-neutral-900">Safa Digital</h1>
-            <p class="text-sm text-neutral-500 mt-1">Ingresa con tus credenciales.</p>
+            @php
+                $logo_ruta = get_setting('logo_ruta');
+                $clean_ruta = str_replace('storage/', '', $logo_ruta);
+                $rutaAbsoluta = storage_path('app/public/' . $clean_ruta);
+                $logoHtml = '';
+                if ($logo_ruta && file_exists($rutaAbsoluta)) {
+                    $ext = strtolower(pathinfo($rutaAbsoluta, PATHINFO_EXTENSION));
+                    $data = file_get_contents($rutaAbsoluta);
+                    $base64 = base64_encode($data);
+                    $mime = ($ext === 'svg') ? 'image/svg+xml' : 'image/' . $ext;
+                    $logoHtml = '<img src="data:' . $mime . ';base64,' . $base64 . '" style="height: 96px; max-height: none; width: auto; display: block; margin: 0 auto 12px auto; object-fit: contain;">';
+                }
+            @endphp
+            
+            @if($logoHtml)
+                {!! $logoHtml !!}
+            @else
+                <h1 class="text-2xl font-bold tracking-tight text-neutral-900 mb-2">Safa Digital</h1>
+            @endif
+            
+            <p class="text-sm text-neutral-500 mt-1">Ingresa tus credenciales para continuar</p>
         </div>
 
         <!-- Formulario Limpio -->
-        <form method="POST" action="/login" class="space-y-5">
+        <form method="POST" action="/login" class="space-y-4">
             @csrf
             
             <div>
-                <label for="email" class="block text-sm font-medium text-neutral-900 mb-1.5">Correo electrónico</label>
-                <input type="email" name="email" id="email" required autofocus
-                    class="block w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 sm:text-sm transition-shadow">
+                <label for="username" class="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">Usuario</label>
+                <input type="text" name="username" id="username" value="{{ old('username') }}" required autofocus placeholder="admin"
+                    class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900">
+                @error('username')
+                    <p class="text-xs text-red-500 mt-1.5">{{ $message }}</p>
+                @enderror
             </div>
 
             <div>
                 <div class="flex items-center justify-between mb-1.5">
-                    <label for="password" class="block text-sm font-medium text-neutral-900">Contraseña</label>
-                    <a href="#" class="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors">¿Olvidaste tu contraseña?</a>
+                    <label for="password" class="block text-xs font-semibold text-neutral-700 uppercase tracking-wider">Contraseña</label>
                 </div>
-                <input type="password" name="password" id="password" required 
-                    class="block w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 sm:text-sm transition-shadow">
+                <input type="password" name="password" id="password" required placeholder="••••••••"
+                    class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900">
+                @error('password')
+                    <p class="text-xs text-red-500 mt-1.5">{{ $message }}</p>
+                @enderror
             </div>
 
-            <div class="flex items-center">
-                <input id="remember_me" type="checkbox" name="remember" class="h-4 w-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900">
-                <label for="remember_me" class="ml-2 block text-sm text-neutral-600">Mantener sesión iniciada</label>
+            <div class="flex items-center justify-between pt-1">
+                <label class="flex items-center cursor-pointer select-none">
+                    <input id="remember_me" type="checkbox" name="remember" class="w-4 h-4 rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300">
+                    <span class="ml-2 text-xs text-neutral-500 font-medium">Mantener sesión</span>
+                </label>
             </div>
 
             <div class="pt-2">
-                <button type="submit" class="w-full bg-neutral-900 hover:bg-neutral-800 text-white font-medium py-2.5 rounded-lg transition-colors flex justify-center shadow-sm">
+                <button type="submit" class="bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg px-4 py-2.5 w-full transition-colors flex justify-center shadow-sm">
                     Iniciar Sesión
                 </button>
             </div>
