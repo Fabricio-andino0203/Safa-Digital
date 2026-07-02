@@ -425,9 +425,10 @@ class PedidoController extends Controller
     public function descargarArchivo($id)
     {
         $archivo = \App\Models\PedidoArchivo::findOrFail($id);
+        $ruta = str_replace('storage/', '', $archivo->ruta);
 
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($archivo->ruta)) {
-            return \Illuminate\Support\Facades\Storage::disk('public')->download($archivo->ruta, $archivo->nombre_original);
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($ruta)) {
+            return response()->download(storage_path('app/public/' . $ruta), $archivo->nombre_original);
         }
 
         return abort(404, 'El archivo no se encontró en el disco del servidor.');

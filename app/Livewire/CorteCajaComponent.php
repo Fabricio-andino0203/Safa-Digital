@@ -18,7 +18,13 @@ class CorteCajaComponent extends Component
     #[On('venta-completada')]
     public function refreshCorte()
     {
-        // Refrescar los totales del corte de caja dinámicamente
+        // Refrescar
+    }
+
+    #[On('update-caja')]
+    public function refreshFinanzas()
+    {
+        // Recalcular
     }
 
     public function render()

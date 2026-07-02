@@ -7,10 +7,16 @@ use Livewire\Component;
 class DashboardComponent extends Component
 {
     protected $listeners = [
-        'transaccion-registrada' => 'actualizarTotales'
+        'transaccion-registrada' => 'actualizarTotales',
+        'update-caja' => 'refreshFinanzas'
     ];
 
     public function actualizarTotales()
+    {
+        // Recalcular
+    }
+
+    public function refreshFinanzas()
     {
         // Recalcular
     }

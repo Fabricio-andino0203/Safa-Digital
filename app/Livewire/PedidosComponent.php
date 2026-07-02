@@ -3,16 +3,16 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use Illuminate\Support\Facades\Storage;
 
 class PedidosComponent extends Component
 {
-    public function descargarArchivo($rutaArchivo)
-    {
-        if (Storage::disk('public')->exists($rutaArchivo)) {
-            return Storage::disk('public')->download($rutaArchivo);
+    public function descargarArchivo($rutaArchivo) {
+        $ruta = str_replace('storage/', '', $rutaArchivo);
+        if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($ruta)) {
+            $this->dispatch('swal-error', ['title' => 'Error', 'message' => 'Archivo no encontrado']);
+            return;
         }
-        $this->dispatch('swal-error', ['title' => 'Error', 'message' => 'El archivo no se encontró en el disco del servidor.']);
+        return response()->download(storage_path('app/public/' . $ruta));
     }
 
     public function render()

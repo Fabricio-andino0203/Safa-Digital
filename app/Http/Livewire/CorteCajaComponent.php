@@ -8,10 +8,16 @@ class CorteCajaComponent extends Component
 {
     protected $listeners = [
         'venta-completada' => '$refresh',
-        'transaccion-registrada' => 'actualizarTotales'
+        'transaccion-registrada' => 'actualizarTotales',
+        'update-caja' => 'refreshFinanzas'
     ];
 
     public function actualizarTotales()
+    {
+        // Recalcular
+    }
+
+    public function refreshFinanzas()
     {
         // Recalcular
     }

@@ -14,7 +14,13 @@ class DashboardComponent extends Component
     #[On('transaccion-registrada')]
     public function actualizarTotales()
     {
-        // Recalcular totales del Dashboard
+        // Recalcular
+    }
+
+    #[On('update-caja')]
+    public function refreshFinanzas()
+    {
+        $this->mount();
     }
 
     public function render()

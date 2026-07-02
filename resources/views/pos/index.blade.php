@@ -659,6 +659,7 @@
                             <div class="flex items-center gap-3">
                                 <input type="checkbox" :value="extra" x-model="extrasSeleccionados"
                                        class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-4 h-4"/>
+                                <input type="checkbox" wire:model="selectedExtras" value="{{ $extra->id }}" class="hidden">
                                 <span class="text-xs font-semibold text-neutral-700" x-text="extra.nombre"></span>
                             </div>
                             <span class="text-xs font-bold text-neutral-900" x-text="'+L. ' + Number(extra.precio).toFixed(2)"></span>
