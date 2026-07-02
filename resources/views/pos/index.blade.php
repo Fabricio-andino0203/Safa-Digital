@@ -657,9 +657,7 @@
                     <template x-for="extra in (productoParaExtras?.extras || [])" :key="extra.id">
                         <label class="flex items-center justify-between p-3 bg-neutral-50 hover:bg-neutral-100/75 rounded-xl cursor-pointer transition-colors border border-neutral-100">
                             <div class="flex items-center gap-3">
-                                <input type="checkbox" :value="extra" x-model="extrasSeleccionados"
-                                       class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-4 h-4"/>
-                                <input type="checkbox" wire:model="selectedExtras" value="{{ $extra->id }}" class="hidden">
+                                <input type="checkbox" :value="extra.id" x-model="$wire.selectedExtras" class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-4 h-4" />
                                 <span class="text-xs font-semibold text-neutral-700" x-text="extra.nombre"></span>
                             </div>
                             <span class="text-xs font-bold text-neutral-900" x-text="'+L. ' + Number(extra.precio).toFixed(2)"></span>
@@ -707,6 +705,9 @@ function posApp() {
         modalCorte: false,
         dineroEsperado: @js($dineroEsperado),
         digitalHoy: @js($digitalHoy),
+        $wire: {
+            selectedExtras: []
+        },
         efectivoReal: 0,
         montoARetirar: 0,
         notasCorte: '',
@@ -837,6 +838,7 @@ function posApp() {
                 this.varianteParaExtras = variante;
                 this.productoParaExtras = producto;
                 this.extrasSeleccionados = [];
+                this.$wire.selectedExtras = [];
                 this.modalExtras = true;
             } else {
                 const cartLineKey = variante.id.toString();
@@ -861,6 +863,10 @@ function posApp() {
         },
 
         confirmarExtrasYAgregar() {
+            // Mapear los IDs en $wire.selectedExtras a objetos completos
+            const seleccionados = (this.productoParaExtras?.extras || []).filter(e => this.$wire.selectedExtras.includes(e.id));
+            this.extrasSeleccionados = seleccionados;
+
             const basePrecio = parseFloat(this.varianteParaExtras.precio);
             const extrasPrecioTotal = this.extrasSeleccionados.reduce((s, e) => s + parseFloat(e.precio), 0);
             const precioFinal = basePrecio + extrasPrecioTotal;
