@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/{id}/fecha-entrega', [PedidoController::class, 'updateFechaEntrega'])->name('updateFechaEntrega');
         Route::post('/{id}/archivos',        [PedidoController::class, 'uploadFiles'])->name('uploadFiles');
         Route::post('/{id}/cancelar',        [PedidoController::class, 'cancelar'])->name('cancelar');
+        Route::get('/archivos/{id}/descargar', [PedidoController::class, 'descargarArchivo'])->name('archivos.descargar');
     });
 
     // ─── Configuración Global ──────────────────────────────────────────────────

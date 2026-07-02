@@ -421,4 +421,15 @@ class PedidoController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
+
+    public function descargarArchivo($id)
+    {
+        $archivo = \App\Models\PedidoArchivo::findOrFail($id);
+
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($archivo->ruta)) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->download($archivo->ruta, $archivo->nombre_original);
+        }
+
+        return abort(404, 'El archivo no se encontró en el disco del servidor.');
+    }
 }
