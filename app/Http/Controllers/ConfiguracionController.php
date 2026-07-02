@@ -141,4 +141,53 @@ class ConfiguracionController extends Controller
         );
         Cache::forget('configuracion_' . $llave);
     }
+
+    /**
+     * Limpia SOLO los datos operativos de prueba.
+     * JAMÁS toca: usuarios, configuración, plantillas, catálogo de productos/variantes.
+     */
+    public function resetPruebas()
+    {
+        try {
+            DB::statement('PRAGMA foreign_keys = OFF');
+
+            // 1. Limpiar historial de ventas POS
+            DB::table('venta_pos_detalles')->delete();
+            DB::table('venta_pos')->delete();
+
+            // 2. Limpiar pedidos y relacionados
+            DB::table('pedido_archivos')->delete();
+            DB::table('pedido_historial')->delete();
+            DB::table('pedido_detalles')->delete();
+            DB::table('pedidos')->delete();
+
+            // 3. Limpiar movimientos y sesiones de caja
+            DB::table('corte_caja')->delete();
+            DB::table('caja_movimientos')->delete();
+            DB::table('caja_sesiones')->delete();
+
+            // 4. Limpiar cotizaciones
+            DB::table('cotizacion_detalles')->delete();
+            DB::table('cotizaciones')->delete();
+
+            // 5. Resetear stock físico y reservado a 0 (mantiene catálogo)
+            DB::table('producto_variantes')->update([
+                'stock_fisico'    => 0,
+                'stock_reservado' => 0,
+            ]);
+
+            DB::statement('PRAGMA foreign_keys = ON');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Datos de prueba eliminados correctamente. El catálogo, usuarios y configuración se mantienen intactos.',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

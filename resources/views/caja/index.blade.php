@@ -9,7 +9,16 @@
     <div class="flex justify-between items-end">
         <div>
             <h2 class="text-2xl font-bold tracking-tight text-neutral-900">Resumen Financiero</h2>
-            <p class="text-neutral-500 text-sm mt-1">Control de caja y cuentas bancarias.</p>
+            <p class="text-neutral-500 text-sm mt-1">
+                @if($sesion)
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        Sesión activa desde {{ $sesion->fecha_apertura->format('d/m/Y H:i') }}
+                    </span>
+                @else
+                    Control de caja y cuentas bancarias.
+                @endif
+            </p>
         </div>
         <button @click="openModal = true" class="px-5 py-2.5 bg-neutral-900 text-white text-sm font-medium rounded-xl hover:bg-neutral-800 transition-colors shadow-sm flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -17,77 +26,120 @@
         </button>
     </div>
 
-    <!-- Tarjetas de Métricas (Grid Estricto CSS) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <!-- Tarjeta: Depósitos -->
-        <div class="bg-white p-6 border border-neutral-100 rounded-2xl shadow-sm flex flex-col justify-between">
-            <h3 class="text-sm font-medium text-neutral-500">Total Depósitos (Hoy)</h3>
+    <!-- Tarjetas de Métricas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Depósitos -->
+        <div class="bg-white p-6 border border-neutral-100 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute right-0 top-0 w-1.5 h-full bg-green-400 rounded-r-2xl"></div>
+            <h3 class="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Total Depósitos {{ $sesion ? '(Sesión Actual)' : '(Hoy)' }}</h3>
             <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($totalIngresos ?? 0, 2) }}</span>
+                <span class="text-3xl font-bold text-neutral-900">L.{{ number_format($totalIngresos ?? 0, 2) }}</span>
             </div>
         </div>
 
-        <!-- Tarjeta: Efectivo en Mano -->
+        <!-- Efectivo en Mano -->
         <div class="bg-white p-6 border border-neutral-100 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden">
-            <div class="absolute right-0 top-0 w-2 h-full bg-green-500"></div>
-            <h3 class="text-sm font-medium text-neutral-500">Efectivo en Mano</h3>
+            <div class="absolute right-0 top-0 w-1.5 h-full bg-neutral-900 rounded-r-2xl"></div>
+            <h3 class="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Efectivo en Mano</h3>
             <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($balanceEfectivo ?? 0, 2) }}</span>
+                <span class="text-3xl font-bold text-neutral-900">L.{{ number_format($balanceEfectivo ?? 0, 2) }}</span>
             </div>
         </div>
 
-        <!-- Tarjeta: Saldo en Bancos -->
+        <!-- Retiros -->
         <div class="bg-white p-6 border border-neutral-100 rounded-2xl shadow-sm flex flex-col justify-between relative overflow-hidden">
-            <div class="absolute right-0 top-0 w-2 h-full bg-blue-500"></div>
-            <h3 class="text-sm font-medium text-neutral-500">Saldo en Bancos</h3>
+            <div class="absolute right-0 top-0 w-1.5 h-full bg-red-400 rounded-r-2xl"></div>
+            <h3 class="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Total Retiros {{ $sesion ? '(Sesión Actual)' : '(Hoy)' }}</h3>
             <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($balanceBancos ?? 0, 2) }}</span>
+                <span class="text-3xl font-bold text-neutral-900">L.{{ number_format($totalEgresos ?? 0, 2) }}</span>
             </div>
         </div>
     </div>
 
-    <!-- Tabla de Movimientos Recientes -->
-    <div class="bg-white border border-neutral-100 rounded-2xl shadow-sm overflow-hidden mt-8">
-        <div class="px-6 py-5 border-b border-neutral-100 bg-[#FAFAFA]">
-            <h3 class="text-base font-semibold text-neutral-900">Movimientos Recientes</h3>
+    <!-- Tabla de Movimientos de la Sesión -->
+    <div class="bg-white border border-neutral-100 rounded-2xl shadow-sm overflow-hidden">
+        <div class="px-6 py-5 border-b border-neutral-100 bg-[#FAFAFA] flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-semibold text-neutral-900">Movimientos de Caja</h3>
+                <p class="text-xs text-neutral-400 mt-0.5">
+                    {{ $sesion ? 'Historial completo de la sesión abierta' : 'Movimientos del día de hoy' }}
+                </p>
+            </div>
+            <span class="text-xs font-medium text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-full">
+                {{ count($movimientosHoy ?? []) }} registro(s)
+            </span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm whitespace-nowrap">
-                <thead class="text-neutral-500 bg-white">
+                <thead class="text-neutral-500 bg-[#FAFAFA]">
                     <tr>
-                        <th class="px-6 py-4 font-medium border-b border-neutral-100">Fecha</th>
-                        <th class="px-6 py-4 font-medium border-b border-neutral-100">Concepto</th>
-                        <th class="px-6 py-4 font-medium border-b border-neutral-100">Método</th>
-                        <th class="px-6 py-4 font-medium border-b border-neutral-100 text-right">Monto</th>
-                        <th class="px-6 py-4 font-medium border-b border-neutral-100 text-right">Acciones</th>
+                        <th class="px-6 py-3.5 font-semibold text-xs uppercase tracking-wider border-b border-neutral-100">Fecha / Hora</th>
+                        <th class="px-6 py-3.5 font-semibold text-xs uppercase tracking-wider border-b border-neutral-100">Tipo</th>
+                        <th class="px-6 py-3.5 font-semibold text-xs uppercase tracking-wider border-b border-neutral-100">Concepto</th>
+                        <th class="px-6 py-3.5 font-semibold text-xs uppercase tracking-wider border-b border-neutral-100">Método</th>
+                        <th class="px-6 py-3.5 font-semibold text-xs uppercase tracking-wider border-b border-neutral-100 text-right">Monto</th>
+                        <th class="px-6 py-3.5 font-semibold text-xs uppercase tracking-wider border-b border-neutral-100 text-center">Recibo</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-neutral-100 bg-white">
+                <tbody class="divide-y divide-neutral-50 bg-white">
                     @forelse($movimientosHoy ?? [] as $movimiento)
                     <tr class="hover:bg-neutral-50 transition-colors">
-                        <td class="px-6 py-4 text-neutral-500">{{ $movimiento->fecha->format('d/m/Y') }}</td>
-                        <td class="px-6 py-4 text-neutral-900 font-medium">{{ $movimiento->concepto }}</td>
+                        <td class="px-6 py-4 text-neutral-500 text-xs font-mono">
+                            {{ $movimiento->fecha->format('d/m/Y') }}
+                            <span class="block text-neutral-400">{{ $movimiento->created_at->format('H:i:s') }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            @if($movimiento->tipo === 'ingreso')
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                                    Depósito
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-100">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                                    Retiro
+                                </span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-neutral-900 font-medium max-w-xs truncate">{{ $movimiento->concepto }}</td>
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-600">
-                                {{ $movimiento->metodo ?? 'Bancos' }}
+                                {{ $movimiento->referencia ?? '—' }}
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-right font-bold {{ $movimiento->tipo == 'ingreso' ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $movimiento->tipo == 'ingreso' ? '+' : '-' }} L. {{ number_format($movimiento->monto, 2) }}
+                        <td class="px-6 py-4 text-right font-bold text-base {{ $movimiento->tipo == 'ingreso' ? 'text-green-600' : 'text-red-600' }}">
+                            {{ $movimiento->tipo == 'ingreso' ? '+' : '-' }} L.{{ number_format($movimiento->monto, 2) }}
                         </td>
-                        <td class="px-6 py-4 text-right">
-                            <a href="{{ route('caja.ticket', $movimiento->id) }}" target="_blank" class="text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-1 text-sm font-medium">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                                Ticket
+                        <td class="px-6 py-4 text-center">
+                            <a href="{{ route('caja.ticket', $movimiento->id) }}" target="_blank"
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neutral-600 bg-neutral-100 hover:bg-neutral-900 hover:text-white rounded-lg transition-colors"
+                               title="Reimprimir Recibo">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                Reimprimir
                             </a>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-neutral-500">No hay movimientos registrados hoy.</td>
+                        <td colspan="6" class="px-6 py-10 text-center text-neutral-400">
+                            <svg class="w-8 h-8 mx-auto mb-2 text-neutral-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <p class="text-sm font-medium">No hay movimientos en esta sesión.</p>
+                            <p class="text-xs text-neutral-300 mt-1">Las ventas y movimientos manuales aparecerán aquí.</p>
+                        </td>
                     </tr>
                     @endforelse
                 </tbody>
+                @if(count($movimientosHoy ?? []) > 0)
+                <tfoot class="bg-[#FAFAFA] border-t border-neutral-200">
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-sm font-bold text-neutral-700 text-right">Balance Neto:</td>
+                        <td class="px-6 py-4 text-right text-base font-bold {{ ($totalIngresos - $totalEgresos) >= 0 ? 'text-green-600' : 'text-red-600' }}">
+                            L.{{ number_format($totalIngresos - $totalEgresos, 2) }}
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+                @endif
             </table>
         </div>
     </div>
@@ -113,39 +165,40 @@
                         </button>
                     </div>
 
-                    <form class="p-6 space-y-6" @submit.prevent="submitMovimiento">
+                    <form class="p-6 space-y-5" @submit.prevent="submitMovimiento">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-neutral-900">Tipo</label>
-                                <select x-model="form.tipo" @change="checkReglas()" class="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm shadow-sm transition-colors cursor-pointer">
+                                <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Tipo</label>
+                                <select x-model="form.tipo" @change="checkReglas()" class="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm transition-colors">
                                     <option value="ingreso">Depósito</option>
-                                    <option value="egreso">Retiro (Gasto)</option>
+                                    <option value="egreso">Retiro</option>
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-neutral-900">Cuenta / Método</label>
-                                <select x-model="form.metodo" :disabled="form.tipo === 'egreso'" class="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm shadow-sm transition-colors cursor-pointer disabled:bg-neutral-50 disabled:text-neutral-500">
-                                    <option value="Efectivo">Efectivo en Mano</option>
-                                    <option value="Bancos">Saldo en Bancos</option>
+                                <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Método</label>
+                                <select x-model="form.metodo" :disabled="form.tipo === 'egreso'" class="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm transition-colors disabled:bg-neutral-50 disabled:text-neutral-400">
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Tarjeta">Tarjeta</option>
                                 </select>
-                                <p x-show="form.tipo === 'egreso'" class="text-xs text-neutral-500 mt-1">Los gastos operativos van a Bancos fijos.</p>
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-neutral-900">Monto (L.)</label>
-                            <input type="number" step="0.01" x-model="form.monto" required class="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm shadow-sm transition-colors">
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Monto (L.)</label>
+                            <input type="number" step="0.01" x-model="form.monto" required min="0.01" class="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm transition-colors">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-neutral-900">Concepto</label>
-                            <input type="text" x-model="form.concepto" required placeholder="Ej. Pago de servicios de luz" class="mt-2 w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm shadow-sm transition-colors">
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Concepto</label>
+                            <input type="text" x-model="form.concepto" required placeholder="Ej. Pago de servicios de luz" class="w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-neutral-900 focus:border-neutral-900 focus:outline-none sm:text-sm transition-colors">
                         </div>
 
-                        <div class="pt-2 flex justify-end gap-3">
+                        <div class="pt-2 flex justify-end gap-3 border-t border-neutral-100">
                             <button type="button" @click="openModal = false" class="px-5 py-2.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Cancelar</button>
-                            <button type="submit" class="px-5 py-2.5 bg-neutral-900 text-white text-sm font-medium rounded-xl hover:bg-neutral-800 transition-colors shadow-sm">
-                                Guardar Movimiento
+                            <button type="submit" :disabled="guardando" class="px-5 py-2.5 bg-neutral-900 text-white text-sm font-semibold rounded-xl hover:bg-neutral-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                                <span x-show="guardando" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                Guardar
                             </button>
                         </div>
                     </form>
@@ -161,6 +214,7 @@
     function tesoreriaBoard() {
         return {
             openModal: false,
+            guardando: false,
             form: {
                 tipo: 'ingreso',
                 metodo: 'Efectivo',
@@ -168,12 +222,12 @@
                 concepto: ''
             },
             checkReglas() {
-                // Regla Innegociable: Los Retiros se descuentan de Bancos
                 if (this.form.tipo === 'egreso') {
                     this.form.metodo = 'Bancos';
                 }
             },
             async submitMovimiento() {
+                this.guardando = true;
                 try {
                     const res = await fetch('{{ route('caja.store') }}', {
                         method: 'POST',
@@ -196,6 +250,8 @@
                     }
                 } catch(e) {
                     alert('Error de conexión al servidor.');
+                } finally {
+                    this.guardando = false;
                 }
             }
         }

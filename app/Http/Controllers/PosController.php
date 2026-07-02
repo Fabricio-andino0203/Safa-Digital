@@ -288,14 +288,15 @@ class PosController extends Controller
                 $item['variante']->venderDirecto($item['cantidad']);
             }
 
-            // ── 4. Registrar en Tesorería ─────────────────────────────────────
+            // ── 4. Registrar movimiento vinculado a la sesión de caja ─────────
             $movimiento = CajaMovimiento::create([
-                'tipo'       => 'ingreso',
-                'monto'      => $total,
-                'concepto'   => 'Venta POS #' . $venta->id,
-                'referencia' => strtoupper($request->metodo_pago),
-                'pedido_id'  => null,
-                'fecha'      => now()->toDateString(),
+                'caja_sesion_id' => $sesion->id,
+                'tipo'           => 'ingreso',
+                'monto'          => $total,
+                'concepto'       => 'Venta POS #' . $venta->id,
+                'referencia'     => strtoupper($request->metodo_pago),
+                'pedido_id'      => null,
+                'fecha'          => now()->toDateString(),
             ]);
 
             DB::commit();

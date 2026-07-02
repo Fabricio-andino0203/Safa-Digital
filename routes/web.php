@@ -58,7 +58,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/empresa', [\App\Http\Controllers\ConfiguracionController::class, 'updateEmpresa'])->name('update.empresa');
         Route::post('/tickets', [\App\Http\Controllers\ConfiguracionController::class, 'updateTickets'])->name('update.tickets');
         Route::post('/whatsapp', [\App\Http\Controllers\ConfiguracionController::class, 'updateWhatsapp'])->name('update.whatsapp');
-        
+        Route::post('/reset-pruebas', [\App\Http\Controllers\ConfiguracionController::class, 'resetPruebas'])->name('reset.pruebas');
+
         // CRUD Usuarios
         Route::post('/usuarios', [\App\Http\Controllers\UsuarioController::class, 'store'])->name('usuarios.store');
         Route::patch('/usuarios/{id}', [\App\Http\Controllers\UsuarioController::class, 'update'])->name('usuarios.update');

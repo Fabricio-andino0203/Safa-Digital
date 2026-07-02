@@ -48,6 +48,11 @@ class CajaSesion extends Model
         return $this->hasMany(VentaPos::class, 'caja_sesion_id');
     }
 
+    public function movimientos(): HasMany
+    {
+        return $this->hasMany(CajaMovimiento::class, 'caja_sesion_id');
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Helpers de negocio
     // ──────────────────────────────────────────────────────────────────────────

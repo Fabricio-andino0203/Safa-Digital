@@ -3,21 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Models\CajaMovimiento;
+use App\Models\CajaSesion;
 use Illuminate\Http\Request;
 
 class CajaController extends Controller
 {
     public function index()
     {
-        // Balance del día actual
-        $movimientosHoy = CajaMovimiento::with('pedido')
-            ->whereDate('fecha', now()->toDateString())
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $sesion = CajaSesion::sesionAbierta();
+
+        // Si hay sesión abierta, mostramos movimientos de esa sesión; si no, del día actual
+        if ($sesion) {
+            $movimientosHoy = CajaMovimiento::with('pedido')
+                ->where('caja_sesion_id', $sesion->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            $movimientosHoy = CajaMovimiento::with('pedido')
+                ->whereDate('fecha', now()->toDateString())
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
 
         $totalIngresos = $movimientosHoy->where('tipo', 'ingreso')->sum('monto');
-        $totalEgresos = $movimientosHoy->where('tipo', 'egreso')->sum('monto');
-        $balance = $totalIngresos - $totalEgresos;
+        $totalEgresos  = $movimientosHoy->where('tipo', 'egreso')->sum('monto');
+        $balance       = $totalIngresos - $totalEgresos;
 
         // Cálculos contables globales históricos
         $todosMovimientos = CajaMovimiento::all();
@@ -34,30 +44,36 @@ class CajaController extends Controller
             return $m->tipo === 'egreso';
         })->sum('monto');
 
-        return view('caja.index', compact('movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance', 'balanceEfectivo', 'balanceBancos'));
+        return view('caja.index', compact(
+            'movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance',
+            'balanceEfectivo', 'balanceBancos', 'sesion'
+        ));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'tipo' => 'required|in:ingreso,egreso',
-            'monto' => 'required|numeric|min:0.01',
-            'concepto' => 'required|string|max:255',
-            'metodo' => 'nullable|string|max:255',
+            'tipo'    => 'required|in:ingreso,egreso',
+            'monto'   => 'required|numeric|min:0.01',
+            'concepto'=> 'required|string|max:255',
+            'metodo'  => 'nullable|string|max:255',
         ]);
 
+        $sesion = CajaSesion::sesionAbierta();
+
         $movimiento = CajaMovimiento::create([
-            'tipo' => $validated['tipo'],
-            'monto' => $validated['monto'],
-            'concepto' => $validated['concepto'],
-            'referencia' => $validated['tipo'] === 'egreso' ? 'Bancos' : ($validated['metodo'] ?? 'Efectivo'),
-            'fecha' => now()->toDateString(),
+            'caja_sesion_id' => $sesion?->id,
+            'tipo'      => $validated['tipo'],
+            'monto'     => $validated['monto'],
+            'concepto'  => $validated['concepto'],
+            'referencia'=> $validated['tipo'] === 'egreso' ? 'Bancos' : ($validated['metodo'] ?? 'Efectivo'),
+            'fecha'     => now()->toDateString(),
         ]);
 
         return response()->json([
-            'success' => true,
+            'success'    => true,
             'movimiento' => $movimiento,
-            'ticket_url' => route('caja.ticket', $movimiento->id)
+            'ticket_url' => route('caja.ticket', $movimiento->id),
         ]);
     }
 

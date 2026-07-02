@@ -8,6 +8,9 @@
     modalUsuario: false, 
     modoEdicion: false, 
     userId: null,
+    modalReset: false,
+    resetConfirmText: '',
+    resetCargando: false,
     formUsuario: { name: '', username: '', password: '', rol: 'empleado', permisos: [] },
     abrirNuevoUsuario() {
         this.formUsuario = { name: '', username: '', password: '', rol: 'empleado', permisos: [] };
@@ -20,6 +23,28 @@
         this.userId = user.id;
         this.modoEdicion = true;
         this.modalUsuario = true;
+    },
+    async ejecutarReset() {
+        if (this.resetConfirmText !== 'LIMPIAR') return;
+        this.resetCargando = true;
+        try {
+            const res = await fetch('{{ route('configuracion.reset.pruebas') }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('✅ ' + data.message);
+                this.modalReset = false;
+            } else {
+                alert('❌ Error: ' + data.message);
+            }
+        } catch(e) {
+            alert('Error de conexión.');
+        } finally {
+            this.resetCargando = false;
+            this.resetConfirmText = '';
+        }
     }
 }" class="max-w-5xl mx-auto space-y-6">
 
@@ -50,6 +75,10 @@
         <button @click="tab = 'usuarios'" :class="tab === 'usuarios' ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'" class="px-5 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             Usuarios y Permisos
+        </button>
+        <button @click="tab = 'zona-segura'" :class="tab === 'zona-segura' ? 'border-red-500 text-red-600' : 'border-transparent text-neutral-500 hover:text-red-500 hover:border-red-300'" class="px-5 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ml-auto">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            Zona Peligrosa
         </button>
     </div>
 
@@ -341,6 +370,66 @@
                         </div>
                     </form>
 
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ ZONA PELIGROSA ══════════════════════════════════════════════════ -->
+    <div x-show="tab === 'zona-segura'" x-cloak class="space-y-4">
+        <div class="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-5 border-b border-red-100 bg-red-50 flex items-center gap-3">
+                <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <div>
+                    <h3 class="text-sm font-bold text-red-700">Zona Peligrosa</h3>
+                    <p class="text-xs text-red-500 mt-0.5">Las acciones aquí son irreversibles. Úsalas solo en entorno de pruebas.</p>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="flex items-start justify-between gap-6">
+                    <div class="flex-1">
+                        <h4 class="text-sm font-bold text-neutral-900">Limpiar Datos de Prueba</h4>
+                        <p class="text-xs text-neutral-500 mt-1 leading-relaxed">Borra permanentemente todo el historial operativo: <strong>ventas POS, pedidos, movimientos de caja y sesiones de caja</strong>. Restablece el stock de todos los productos a <strong>0</strong>.</p>
+                        <ul class="mt-2 space-y-0.5 text-xs text-neutral-400">
+                            <li class="flex items-center gap-1.5"><svg class="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> Se conservan: usuarios, empresa, plantillas de WhatsApp, catálogo de productos.</li>
+                            <li class="flex items-center gap-1.5"><svg class="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg> Se eliminan: ventas, pedidos, movimientos de caja, stock físico.</li>
+                        </ul>
+                    </div>
+                    <button @click="modalReset = true; resetConfirmText = ''" class="flex-shrink-0 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        Limpiar Datos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación Reset -->
+    <div x-show="modalReset" class="relative z-50" style="display:none;">
+        <div class="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm" @click="modalReset = false"></div>
+        <div class="fixed inset-0 z-10 flex items-center justify-center p-4">
+            <div x-show="modalReset"
+                 x-transition:enter="ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 class="bg-white rounded-2xl border border-red-200 shadow-2xl w-full max-w-md">
+                <div class="px-6 py-5 border-b border-red-100 bg-red-50 flex items-center gap-3">
+                    <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <h3 class="text-base font-bold text-red-700">¿Confirmar limpieza total?</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <p class="text-sm text-neutral-700">Esta acción borrará permanentemente <strong>todas las ventas, pedidos, movimientos de caja y stock físico</strong>. Esta operación NO puede deshacerse.</p>
+                    <div>
+                        <label class="block text-xs font-bold text-neutral-600 mb-1.5">Escribe <code class="bg-neutral-100 px-1.5 py-0.5 rounded font-mono text-red-600">LIMPIAR</code> para confirmar:</label>
+                        <input type="text" x-model="resetConfirmText" placeholder="LIMPIAR" class="w-full rounded-xl border border-red-200 focus:border-red-500 focus:outline-none px-4 py-2.5 text-sm font-mono tracking-widest uppercase" autocomplete="off">
+                    </div>
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" @click="modalReset = false" class="px-5 py-2.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Cancelar</button>
+                        <button type="button" @click="ejecutarReset()" :disabled="resetConfirmText !== 'LIMPIAR' || resetCargando" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-200 text-white text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center gap-2">
+                            <span x-show="resetCargando" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                            Confirmar y Limpiar
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
