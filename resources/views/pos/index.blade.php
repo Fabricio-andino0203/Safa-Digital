@@ -930,6 +930,7 @@ function posApp() {
                             metodo_pago: data.venta.metodo_pago
                         }
                     }));
+                    window.dispatchEvent(new CustomEvent('transaccion-registrada'));
 
                     // Actualizar stock local en el catálogo
                     this.carrito.forEach(item => {

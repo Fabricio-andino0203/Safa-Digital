@@ -13,9 +13,21 @@ class DashboardController extends Controller
     {
         $pedidosActivos = Pedido::whereNotIn('estado', ['Entregado', 'Liquidado', 'Cancelado'])->count();
 
-        $ventasHoy = Pedido::whereDate('created_at', today())
-            ->where('estado', '!=', 'Cancelado')
-            ->sum('total_pedido');
+        // 1. Efectivo en Caja (Hoy)
+        $efectivoHoy = \App\Models\CajaMovimiento::whereDate('created_at', today())
+            ->where('tipo', 'ingreso')
+            ->where('referencia', 'EFECTIVO')
+            ->sum('monto');
+
+        // 2. Cuentas por Cobrar (Adeudado)
+        $cuentasCobrar = Pedido::whereNotIn('estado', ['Liquidado', 'Cancelado'])
+            ->sum('saldo_pendiente');
+
+        // 3. Ingresos por Transferencia/Tarjeta (Hoy)
+        $transferenciaHoy = \App\Models\CajaMovimiento::whereDate('created_at', today())
+            ->where('tipo', 'ingreso')
+            ->whereIn('referencia', ['TRANSFERENCIA', 'TARJETA'])
+            ->sum('monto');
 
         $clientesTotales = Cliente::count();
 
@@ -28,7 +40,9 @@ class DashboardController extends Controller
 
         return view('dashboard', compact(
             'pedidosActivos',
-            'ventasHoy',
+            'efectivoHoy',
+            'cuentasCobrar',
+            'transferenciaHoy',
             'clientesTotales',
             'alertasStock',
             'pedidosRecientes'

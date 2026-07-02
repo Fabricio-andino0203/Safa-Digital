@@ -9,6 +9,12 @@ class CorteCajaComponent extends Component
 {
     public $dineroEsperado = 0;
 
+    #[On('transaccion-registrada')]
+    public function actualizarTotales()
+    {
+        // Recalcular los totales de la base de datos
+    }
+
     #[On('venta-completada')]
     public function refreshCorte()
     {

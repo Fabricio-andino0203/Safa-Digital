@@ -4,10 +4,9 @@ namespace App\Http\Livewire;
 
 use Livewire\Component;
 
-class CorteCajaComponent extends Component
+class DashboardComponent extends Component
 {
     protected $listeners = [
-        'venta-completada' => '$refresh',
         'transaccion-registrada' => 'actualizarTotales'
     ];
 
@@ -18,6 +17,6 @@ class CorteCajaComponent extends Component
 
     public function render()
     {
-        return view('livewire.corte-caja-component');
+        return view('livewire.dashboard-component');
     }
 }
