@@ -78,6 +78,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/',  [CajaController::class, 'index'])->name('index');
         Route::post('/', [CajaController::class, 'store'])->name('store');
         Route::get('/{id}/ticket', [CajaController::class, 'descargarTicket'])->name('ticket');
+        Route::get('/historial', [\App\Http\Controllers\HistorialMovimientosController::class, 'index'])->name('historial');
+        Route::get('/historial/{id}/reimprimir', [\App\Http\Controllers\HistorialMovimientosController::class, 'reimprimir'])->name('historial.reimprimir');
     });
 
     // ─── Inventario ───────────────────────────────────────────────────────────────
