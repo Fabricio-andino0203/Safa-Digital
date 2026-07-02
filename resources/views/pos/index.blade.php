@@ -582,9 +582,15 @@
                     </div>
 
                     <div class="space-y-4">
-                        <div class="bg-neutral-50 rounded-2xl p-4 border border-neutral-200">
-                            <span class="text-xs font-bold text-neutral-400 uppercase tracking-wider block">Dinero Esperado en Caja</span>
-                            <span class="text-2xl font-black text-neutral-900 mt-1" x-text="'L. ' + Number(dineroEsperado).toFixed(2)"></span>
+                        <div class="bg-neutral-50 rounded-2xl p-4 border border-neutral-200 space-y-3">
+                            <div>
+                                <span class="text-[10px] font-extrabold text-neutral-400 uppercase tracking-widest block">Efectivo Esperado en Gaveta</span>
+                                <span class="text-2xl font-black text-neutral-900 mt-0.5" x-text="'L. ' + Number(dineroEsperado).toFixed(2)"></span>
+                            </div>
+                            <div class="border-t border-neutral-200/60 pt-2 flex justify-between items-center text-xs">
+                                <span class="font-semibold text-neutral-500">Cobros Digitales Hoy (Bancos):</span>
+                                <span class="font-bold text-neutral-800" x-text="'L. ' + Number(digitalHoy).toFixed(2)"></span>
+                            </div>
                         </div>
 
                         <div>
@@ -699,6 +705,7 @@ function posApp() {
         // Corte de Caja
         modalCorte: false,
         dineroEsperado: @js($dineroEsperado),
+        digitalHoy: @js($digitalHoy),
         efectivoReal: 0,
         montoARetirar: 0,
         notasCorte: '',
@@ -778,8 +785,19 @@ function posApp() {
                 this.errorCorte = '';
             });
             window.addEventListener('venta-completada', e => {
-                if (e.detail && e.detail.metodo_pago === 'efectivo') {
-                    this.dineroEsperado = parseFloat(this.dineroEsperado || 0) + parseFloat(e.detail.total || 0);
+                if (e.detail) {
+                    if (e.detail.metodo_pago === 'efectivo') {
+                        this.dineroEsperado = parseFloat(this.dineroEsperado || 0) + parseFloat(e.detail.total || 0);
+                    } else if (['transferencia', 'tarjeta'].includes(e.detail.metodo_pago)) {
+                        this.digitalHoy = parseFloat(this.digitalHoy || 0) + parseFloat(e.detail.total || 0);
+                    } else if (e.detail.metodo_pago === 'mixto') {
+                        // En mixto, el efectivo es montoEntregado y el remanente es digital
+                        const totalVenta = parseFloat(e.detail.total || 0);
+                        const efec = Math.min(totalVenta, parseFloat(this.montoEntregado || 0));
+                        const dig = Math.max(0.00, totalVenta - efec);
+                        this.dineroEsperado = parseFloat(this.dineroEsperado || 0) + efec;
+                        this.digitalHoy = parseFloat(this.digitalHoy || 0) + dig;
+                    }
                 }
             });
         },

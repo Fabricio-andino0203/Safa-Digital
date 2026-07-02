@@ -85,17 +85,32 @@ class PosController extends Controller
 
         $clientes = \App\Models\Cliente::orderBy('nombre')->get();
 
-        // Calcular dinero esperado en caja
+        // Calcular dinero esperado en caja física (efectivo estrictamente)
         $dineroEsperado = 0;
+        $digitalHoy = 0;
         if ($sesion) {
-            $ventasEfectivo = $sesion->ventas()->where('estado', 'completada')->where('metodo_pago', 'efectivo')->sum('total');
-            $retiros = CajaMovimiento::where('tipo', 'egreso')
-                ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
+            $ingresosEfectivo = \App\Models\CajaMovimiento::where('caja_sesion_id', $sesion->id)
+                ->where('tipo', 'ingreso')
+                ->where('referencia', 'EFECTIVO')
                 ->sum('monto');
-            $dineroEsperado = $sesion->monto_inicial + $ventasEfectivo - $retiros;
+
+            $egresosEfectivo = \App\Models\CajaMovimiento::where('caja_sesion_id', $sesion->id)
+                ->where('tipo', 'egreso')
+                ->where('referencia', 'EFECTIVO')
+                ->sum('monto');
+
+            $dineroEsperado = $sesion->monto_inicial + $ingresosEfectivo - $egresosEfectivo;
+
+            // Total cobrado por medios digitales hoy en la sesión
+            $digitalHoy = \App\Models\CajaMovimiento::where(function($q) use ($sesion) {
+                    $q->whereDate('created_at', $sesion->fecha_apertura->toDateString());
+                })
+                ->where('tipo', 'ingreso')
+                ->whereIn('referencia', ['TRANSFERENCIA', 'TARJETA'])
+                ->sum('monto');
         }
 
-        return view('pos.index', compact('sesion', 'productos', 'pedidosPendientes', 'clientes', 'dineroEsperado'));
+        return view('pos.index', compact('sesion', 'productos', 'pedidosPendientes', 'clientes', 'dineroEsperado', 'digitalHoy'));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -288,16 +303,59 @@ class PosController extends Controller
                 $item['variante']->venderDirecto($item['cantidad']);
             }
 
-            // ── 4. Registrar movimiento vinculado a la sesión de caja ─────────
-            $movimiento = CajaMovimiento::create([
-                'caja_sesion_id' => $sesion->id,
-                'tipo'           => 'ingreso',
-                'monto'          => $total,
-                'concepto'       => 'Venta POS #' . $venta->id,
-                'referencia'     => strtoupper($request->metodo_pago),
-                'pedido_id'      => null,
-                'fecha'          => now()->toDateString(),
-            ]);
+            // ── 4. Segregación Contable de Fondos (Efectivo vs Digital) ───────
+            $montoEfectivo = 0;
+            $montoDigital = 0;
+
+            if ($request->metodo_pago === 'efectivo') {
+                $montoEfectivo = $total;
+            } elseif (in_array($request->metodo_pago, ['transferencia', 'tarjeta'])) {
+                $montoDigital = $total;
+            } elseif ($request->metodo_pago === 'mixto') {
+                $montoEfectivo = min($total, floatval($request->monto_entregado ?? 0));
+                $montoDigital = max(0.00, $total - $montoEfectivo);
+            }
+
+            if ($montoEfectivo > 0) {
+                CajaMovimiento::create([
+                    'caja_sesion_id' => $sesion->id,
+                    'tipo'           => 'ingreso',
+                    'monto'          => $montoEfectivo,
+                    'concepto'       => 'Venta POS #' . $venta->id . ' (Efectivo)',
+                    'referencia'     => 'EFECTIVO',
+                    'pedido_id'      => null,
+                    'fecha'          => now()->toDateString(),
+                ]);
+            }
+
+            if ($montoDigital > 0) {
+                CajaMovimiento::create([
+                    'caja_sesion_id' => null, // Excluido del arqueo de caja física
+                    'tipo'           => 'ingreso',
+                    'monto'          => $montoDigital,
+                    'concepto'       => 'Venta POS #' . $venta->id . ' (' . ucfirst($request->metodo_pago) . ')',
+                    'referencia'     => strtoupper($request->metodo_pago),
+                    'pedido_id'      => null,
+                    'fecha'          => now()->toDateString(),
+                ]);
+
+                // Registrar en el módulo de Tesorería (Cuenta de Bancos)
+                $cuentaBancos = CuentaFinanciera::where('nombre', 'Bancos')->first();
+                if (!$cuentaBancos) {
+                    $cuentaBancos = CuentaFinanciera::where('tipo', 'banco')->first();
+                }
+                if ($cuentaBancos) {
+                    MovimientoTesoreria::create([
+                        'cuenta_id' => $cuentaBancos->id,
+                        'tipo' => 'ingreso',
+                        'monto' => $montoDigital,
+                        'concepto' => 'Venta POS #' . $venta->id . ' (' . ucfirst($request->metodo_pago) . ')',
+                        'referencia_modulo' => 'POS-Venta-Digital',
+                        'usuario_id' => Auth::id() ?? 1,
+                    ]);
+                    $cuentaBancos->increment('saldo_actual', $montoDigital);
+                }
+            }
 
             DB::commit();
 
@@ -402,16 +460,65 @@ class PosController extends Controller
             
             $pedido->save();
 
-            // Registrar ingreso en tesorería
-            $movimiento = CajaMovimiento::create([
-                'caja_sesion_id' => $sesion->id,
-                'tipo'       => 'ingreso',
-                'monto'      => $monto_pagado,
-                'concepto'   => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden,
-                'referencia' => strtoupper($request->metodo_pago),
-                'pedido_id'  => $pedido->id,
-                'fecha'      => now()->toDateString(),
-            ]);
+            // ── Registrar ingreso con segregación contable de fondos ─────────
+            $montoEfectivo = 0;
+            $montoDigital = 0;
+
+            if ($request->metodo_pago === 'efectivo') {
+                $montoEfectivo = $monto_pagado;
+            } elseif (in_array($request->metodo_pago, ['transferencia', 'tarjeta'])) {
+                $montoDigital = $monto_pagado;
+            } elseif ($request->metodo_pago === 'mixto') {
+                $montoEfectivo = min($monto_pagado, floatval($request->monto_entregado ?? 0));
+                $montoDigital = max(0.00, $monto_pagado - $montoEfectivo);
+            }
+
+            $movimiento = null;
+
+            if ($montoEfectivo > 0) {
+                $movimiento = CajaMovimiento::create([
+                    'caja_sesion_id' => $sesion->id,
+                    'tipo'           => 'ingreso',
+                    'monto'          => $montoEfectivo,
+                    'concepto'       => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden . ' (Efectivo)',
+                    'referencia'     => 'EFECTIVO',
+                    'pedido_id'      => $pedido->id,
+                    'fecha'          => now()->toDateString(),
+                ]);
+            }
+
+            if ($montoDigital > 0) {
+                $movDigital = CajaMovimiento::create([
+                    'caja_sesion_id' => null, // Excluido del arqueo de caja física
+                    'tipo'           => 'ingreso',
+                    'monto'          => $montoDigital,
+                    'concepto'       => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden . ' (' . ucfirst($request->metodo_pago) . ')',
+                    'referencia'     => strtoupper($request->metodo_pago),
+                    'pedido_id'      => $pedido->id,
+                    'fecha'          => now()->toDateString(),
+                ]);
+
+                if (!$movimiento) {
+                    $movimiento = $movDigital;
+                }
+
+                // Registrar en bancos de Tesorería
+                $cuentaBancos = CuentaFinanciera::where('nombre', 'Bancos')->first();
+                if (!$cuentaBancos) {
+                    $cuentaBancos = CuentaFinanciera::where('tipo', 'banco')->first();
+                }
+                if ($cuentaBancos) {
+                    MovimientoTesoreria::create([
+                        'cuenta_id' => $cuentaBancos->id,
+                        'tipo' => 'ingreso',
+                        'monto' => $montoDigital,
+                        'concepto' => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden . ' (' . ucfirst($request->metodo_pago) . ')',
+                        'referencia_modulo' => 'Pedido-Cobro-Digital',
+                        'usuario_id' => Auth::id() ?? 1,
+                    ]);
+                    $cuentaBancos->increment('saldo_actual', $montoDigital);
+                }
+            }
 
             DB::commit();
 
