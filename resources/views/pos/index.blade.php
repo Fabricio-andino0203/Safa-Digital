@@ -777,6 +777,11 @@ function posApp() {
                 this.notasCorte = '';
                 this.errorCorte = '';
             });
+            window.addEventListener('venta-completada', e => {
+                if (e.detail && e.detail.metodo_pago === 'efectivo') {
+                    this.dineroEsperado = parseFloat(this.dineroEsperado || 0) + parseFloat(e.detail.total || 0);
+                }
+            });
         },
 
         // ── Productos / Filtrar ──────────────────────────────────────────────
@@ -899,6 +904,14 @@ function posApp() {
                     if (data.ticket_url) {
                         window.open(data.ticket_url, '_blank');
                     }
+
+                    // Despachar evento global de venta completada para actualizar dinero esperado en tiempo real
+                    window.dispatchEvent(new CustomEvent('venta-completada', {
+                        detail: {
+                            total: data.venta.total,
+                            metodo_pago: data.venta.metodo_pago
+                        }
+                    }));
 
                     // Actualizar stock local en el catálogo
                     this.carrito.forEach(item => {
