@@ -868,6 +868,29 @@
 @endsection
 
 @push('scripts')
+@php
+$dataVariantes = \App\Models\ProductoVariante::with(['producto.extras'])
+    ->where('activo', true)
+    ->whereHas('producto', function($q) { $q->where('activo', true); })
+    ->get()
+    ->map(function($v) {
+        return [
+            'id'              => $v->id,
+            'sku'             => $v->sku,
+            'nombre_completo' => $v->nombre_completo,
+            'precio'          => (float) $v->precio,
+            'stock'           => $v->stock_disponible,
+            'extras'          => $v->producto->extras->map(function($e) {
+                return [
+                    'id'     => $e->id,
+                    'nombre' => $e->nombre,
+                    'costo'  => (float) $e->costo,
+                    'precio' => (float) $e->precio,
+                ];
+            })->values(),
+        ];
+    });
+@endphp
 <script>
     const plantillasConfig = @json($plantillas);
 </script>
@@ -910,25 +933,7 @@
             
             clientesList: @json(\App\Models\Cliente::all()),
             pedidosList: @json($pedidos->flatten()),
-            variantesData: @json(
-                \App\Models\ProductoVariante::with(['producto.extras'])
-                    ->where('activo', true)
-                    ->whereHas('producto', fn($q) => $q->where('activo', true))
-                    ->get()
-                    ->map(fn($v) => [
-                        'id'              => $v->id,
-                        'sku'             => $v->sku,
-                        'nombre_completo' => $v->nombre_completo,
-                        'precio'          => (float) $v->precio,
-                        'stock'           => $v->stock_disponible,
-                        'extras'          => $v->producto->extras->map(fn($e) => [
-                            'id'     => $e->id,
-                            'nombre' => $e->nombre,
-                            'costo'  => (float) $e->costo,
-                            'precio' => (float) $e->precio,
-                        ])->values(),
-                    ])
-            ),
+            variantesData: @json($dataVariantes),
             variantesExtrasMap: {},
             pedidoSeleccionado: null,
             modalDetalles: false,
