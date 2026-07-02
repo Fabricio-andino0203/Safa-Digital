@@ -222,5 +222,58 @@
 
     @stack('modals')
     @stack('scripts')
+
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('swal-success', (event) => {
+                let data = event[0] || event;
+                Swal.fire({
+                    title: data.title || '¡Éxito!',
+                    text: data.message,
+                    icon: 'success',
+                    confirmButtonColor: '#000000',
+                    background: '#ffffff',
+                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+                });
+            });
+            Livewire.on('swal-error', (event) => {
+                let data = event[0] || event;
+                Swal.fire({
+                    title: data.title || 'Error',
+                    text: data.message,
+                    icon: 'error',
+                    confirmButtonColor: '#000000',
+                    background: '#ffffff',
+                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+                });
+            });
+        });
+
+        // Sobreescribir el alert nativo para una experiencia premium minimalista
+        window.alert = function(message) {
+            let icon = 'info';
+            let title = 'Información';
+            
+            const lowerMsg = message.toLowerCase();
+            if (lowerMsg.includes('éxito') || lowerMsg.includes('correcto') || lowerMsg.includes('exitosamente') || lowerMsg.includes('completado') || lowerMsg.includes('creado') || lowerMsg.includes('actualizado')) {
+                icon = 'success';
+                title = '¡Éxito!';
+            } else if (lowerMsg.includes('error') || lowerMsg.includes('fall') || lowerMsg.includes('insuficiente') || lowerMsg.includes('incorrecto') || lowerMsg.includes('ya fue') || lowerMsg.includes('ya existe')) {
+                icon = 'error';
+                title = 'Atención';
+            }
+
+            Swal.fire({
+                title: title,
+                text: message,
+                icon: icon,
+                confirmButtonColor: '#000000',
+                background: '#ffffff',
+                customClass: { popup: 'rounded-2xl border border-neutral-100 shadow-xl' }
+            });
+        };
+    </script>
 </body>
 </html>
