@@ -24,6 +24,7 @@ class PedidoDetalle extends Model
         'precio_unitario',
         'precio_venta',
         'subtotal',
+        'extras',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class PedidoDetalle extends Model
         'precio_unitario' => 'decimal:2',
         'precio_venta'    => 'decimal:2',
         'subtotal'        => 'decimal:2',
+        'extras'          => 'array',
     ];
 
     public function pedido(): BelongsTo

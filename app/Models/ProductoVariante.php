@@ -140,6 +140,9 @@ class ProductoVariante extends Model
     {
         $this->decrement('stock_fisico', $cantidad);
         $this->decrement('stock_reservado', min($cantidad, $this->stock_reservado));
+        
+        $this->refresh();
+        $this->verificarStockBajo();
     }
 
     /**
@@ -158,6 +161,27 @@ class ProductoVariante extends Model
         }
 
         $this->decrement('stock_fisico', $cantidad);
+        
+        $this->refresh();
+        $this->verificarStockBajo();
+    }
+
+    public function verificarStockBajo(): void
+    {
+        $disponible = $this->stock_disponible;
+        $minimo = $this->stock_minimo > 0 ? $this->stock_minimo : 5;
+        if ($disponible <= $minimo) {
+            $admin = \App\Models\User::find(1);
+            if ($admin) {
+                $exists = $admin->unreadNotifications()
+                    ->where('data->type', 'stock_bajo')
+                    ->where('data->mensaje', 'LIKE', "%{$this->sku}%")
+                    ->exists();
+                if (!$exists) {
+                    $admin->notify(new \App\Notifications\StockBajoNotification($this->sku, $this->nombre_completo, $disponible));
+                }
+            }
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────

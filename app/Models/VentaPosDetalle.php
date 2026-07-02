@@ -21,6 +21,7 @@ class VentaPosDetalle extends Model
         'precio_unitario',
         'descuento_linea',
         'subtotal',
+        'extras',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class VentaPosDetalle extends Model
         'precio_unitario' => 'decimal:2',
         'descuento_linea' => 'decimal:2',
         'subtotal'        => 'decimal:2',
+        'extras'          => 'array',
     ];
 
     // ──────────────────────────────────────────────────────────────────────────

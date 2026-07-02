@@ -145,9 +145,56 @@
                         </div>
                     </div>
                 </div>
-                <button class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                </button>
+                <!-- Dropdown de Notificaciones -->
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 transition-colors relative">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        @if(auth()->check() && auth()->user()->unreadNotifications->count() > 0)
+                            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+                        @endif
+                    </button>
+                    <!-- Menu Desplegable -->
+                    <div x-show="open" 
+                         @click.away="open = false" 
+                         x-transition:enter="transition ease-out duration-100" 
+                         x-transition:enter-start="transform opacity-0 scale-95" 
+                         x-transition:enter-end="transform opacity-100 scale-100" 
+                         x-transition:leave="transition ease-in duration-75" 
+                         x-transition:leave-start="transform opacity-100 scale-100" 
+                         x-transition:leave-end="transform opacity-0 scale-95" 
+                         class="absolute right-0 mt-2 w-80 bg-white border border-neutral-200 rounded-2xl shadow-xl p-4 z-50 space-y-3"
+                         x-cloak>
+                        <div class="flex items-center justify-between border-b border-neutral-100 pb-2">
+                            <span class="text-xs font-bold text-neutral-500 uppercase tracking-wider">Notificaciones</span>
+                            @if(auth()->check() && auth()->user()->unreadNotifications->count() > 0)
+                                <form action="{{ route('notificaciones.leerTodas') }}" method="POST" class="inline">
+                                    @csrf
+                                    <button type="submit" class="text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors">Leer todas</button>
+                                </form>
+                            @endif
+                        </div>
+                        <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                            @if(auth()->check() && auth()->user()->unreadNotifications->count() > 0)
+                                @foreach(auth()->user()->unreadNotifications as $notification)
+                                    <div class="p-3 bg-neutral-50 hover:bg-neutral-100 rounded-xl transition-all border border-neutral-100 text-left space-y-1 relative group">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-[11px] font-bold text-neutral-800">{{ $notification->data['titulo'] ?? 'Alerta' }}</span>
+                                            <span class="text-[9px] text-neutral-400 font-medium">{{ $notification->created_at->diffForHumans() }}</span>
+                                        </div>
+                                        <p class="text-[10px] text-neutral-500 leading-normal">{{ $notification->data['mensaje'] ?? '' }}</p>
+                                        @if(!empty($notification->data['link']))
+                                            <a href="{{ $notification->data['link'] }}" class="text-[9px] font-bold text-neutral-900 hover:underline block pt-1">Ver detalles &rarr;</a>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            @else
+                                <div class="py-6 text-center text-neutral-400 text-xs">
+                                    Sin notificaciones pendientes.
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs font-bold shadow-sm" title="{{ auth()->user()->name ?? 'SA' }}">
                         {{ strtoupper(substr(auth()->user()->name ?? 'SA', 0, 2)) }}

@@ -50,6 +50,12 @@ class Producto extends Model
         return $this->hasMany(ProductoVariante::class)->where('activo', true);
     }
 
+    /** Extras asociados a este producto */
+    public function extras(): HasMany
+    {
+        return $this->hasMany(ProductoExtra::class);
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Accesores de stock agregado (calculados desde las variantes)
     // ──────────────────────────────────────────────────────────────────────────

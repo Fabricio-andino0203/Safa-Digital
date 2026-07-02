@@ -21,7 +21,8 @@ class CotizacionDetalle extends Model
         'costo_libre',
         'precio_venta',
         'cantidad',
-        'subtotal'
+        'subtotal',
+        'extras'
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class CotizacionDetalle extends Model
         'precio_venta' => 'decimal:2',
         'cantidad'     => 'integer',
         'subtotal'     => 'decimal:2',
+        'extras'       => 'array'
     ];
 
     public function cotizacion(): BelongsTo

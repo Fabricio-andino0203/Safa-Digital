@@ -626,6 +626,48 @@
         </div>
     </div>
 
+    <!-- Modal de Selección de Extras -->
+    <div x-show="modalExtras" x-cloak
+         class="fixed inset-0 z-[60] bg-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+         @keydown.escape.window="modalExtras = false">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm border border-neutral-100"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100">
+            
+            <div class="px-7 py-5 border-b border-neutral-100 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-neutral-900">Adicionales / Extras</h3>
+                    <p class="text-xs text-neutral-400 mt-0.5" x-text="varianteParaExtras?.sku"></p>
+                </div>
+                <button @click="modalExtras = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="p-7 space-y-4">
+                <p class="text-xs text-neutral-500">Selecciona los extras que deseas agregar a este producto:</p>
+                <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    <template x-for="extra in (productoParaExtras?.extras || [])" :key="extra.id">
+                        <label class="flex items-center justify-between p-3 bg-neutral-50 hover:bg-neutral-100/75 rounded-xl cursor-pointer transition-colors border border-neutral-100">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" :value="extra" x-model="extrasSeleccionados"
+                                       class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-4 h-4"/>
+                                <span class="text-xs font-semibold text-neutral-700" x-text="extra.nombre"></span>
+                            </div>
+                            <span class="text-xs font-bold text-neutral-900" x-text="'+L. ' + Number(extra.precio).toFixed(2)"></span>
+                        </label>
+                    </template>
+                </div>
+
+                <button @click="confirmarExtrasYAgregar()"
+                        class="w-full py-3 bg-neutral-900 text-white font-semibold rounded-2xl hover:bg-neutral-800 transition-all text-xs">
+                    Confirmar y Agregar
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
@@ -671,6 +713,12 @@ function posApp() {
         // Modal selector de variante
         modalVariante:       false,
         productoSeleccionado: null,
+
+        // Modal selector de extras
+        modalExtras:         false,
+        varianteParaExtras:  null,
+        productoParaExtras:  null,
+        extrasSeleccionados: [],
 
         // Carrito — items: { varianteId, productoId, nombre, sku, precio, stockDisponible, qty }
         carrito:  [],
@@ -759,20 +807,62 @@ function posApp() {
 
         // ── Carrito ──────────────────────────────────────────────────────────
         agregarVariante(variante, productoImagen = null) {
-            const ex = this.carrito.find(i => i.varianteId === variante.id);
+            // Buscar el producto padre para ver si tiene extras
+            const producto = this.todos.find(p => p.id === (variante.producto_id || this.productoSeleccionado?.id));
+            if (producto && producto.extras && producto.extras.length > 0) {
+                this.varianteParaExtras = variante;
+                this.productoParaExtras = producto;
+                this.extrasSeleccionados = [];
+                this.modalExtras = true;
+            } else {
+                const cartLineKey = variante.id.toString();
+                const ex = this.carrito.find(i => i.cartLineKey === cartLineKey);
+                if (ex) {
+                    if (ex.qty < ex.stockDisponible) ex.qty++;
+                } else {
+                    this.carrito.push({
+                        cartLineKey:    cartLineKey,
+                        varianteId:     variante.id,
+                        nombre:         variante.nombre_completo,
+                        sku:            variante.sku,
+                        precio:         parseFloat(variante.precio),
+                        stockDisponible: variante.stock_disponible,
+                        imagen:         variante.imagen || productoImagen || this.productoSeleccionado?.imagen,
+                        qty:            1,
+                        extras:         [],
+                    });
+                }
+                this.modalVariante = false;
+            }
+        },
+
+        confirmarExtrasYAgregar() {
+            const basePrecio = parseFloat(this.varianteParaExtras.precio);
+            const extrasPrecioTotal = this.extrasSeleccionados.reduce((s, e) => s + parseFloat(e.precio), 0);
+            const precioFinal = basePrecio + extrasPrecioTotal;
+            
+            const extrasIds = this.extrasSeleccionados.map(e => e.id).sort().join('-');
+            const cartLineKey = this.varianteParaExtras.id + (extrasIds ? '-' + extrasIds : '');
+
+            const ex = this.carrito.find(i => i.cartLineKey === cartLineKey);
             if (ex) {
                 if (ex.qty < ex.stockDisponible) ex.qty++;
             } else {
                 this.carrito.push({
-                    varianteId:     variante.id,
-                    nombre:         variante.nombre_completo,
-                    sku:            variante.sku,
-                    precio:         parseFloat(variante.precio),
-                    stockDisponible: variante.stock_disponible,
-                    imagen:         variante.imagen || productoImagen || this.productoSeleccionado?.imagen,
+                    cartLineKey:    cartLineKey,
+                    varianteId:     this.varianteParaExtras.id,
+                    nombre:         this.varianteParaExtras.nombre_completo + (this.extrasSeleccionados.length > 0 ? ' (' + this.extrasSeleccionados.map(e => e.nombre).join(', ') + ')' : ''),
+                    sku:            this.varianteParaExtras.sku,
+                    precio:         precioFinal,
+                    stockDisponible: this.varianteParaExtras.stock_disponible,
+                    imagen:         this.varianteParaExtras.imagen || this.productoParaExtras?.imagen,
                     qty:            1,
+                    extras:         JSON.parse(JSON.stringify(this.extrasSeleccionados)),
                 });
             }
+
+            this.modalExtras = false;
+            this.modalVariante = false;
         },
 
         inc(i) { if (this.carrito[i].qty < this.carrito[i].stockDisponible) this.carrito[i].qty++; },
@@ -793,7 +883,7 @@ function posApp() {
                     },
                     body: JSON.stringify({
                         caja_sesion_id:  this.sesionId,
-                        carrito:         this.carrito.map(i => ({ id: i.varianteId, qty: i.qty })),
+                        carrito:         this.carrito.map(i => ({ id: i.varianteId, qty: i.qty, extras: i.extras })),
                         descuento:       this.descuento || 0,
                         metodo_pago:     this.metodoPago,
                         monto_entregado: this.metodoPago === 'efectivo' ? this.montoEntregado : null,

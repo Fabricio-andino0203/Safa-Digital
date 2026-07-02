@@ -91,4 +91,52 @@ class TesoreriaController extends Controller
             return back()->with('error', 'Error al registrar el movimiento: ' . $e->getMessage())->withInput();
         }
     }
+
+    public function trasladarFondos(Request $request)
+    {
+        $request->validate([
+            'cuenta_origen_id'  => 'required|exists:cuenta_financieras,id',
+            'cuenta_destino_id' => 'required|exists:cuenta_financieras,id|different:cuenta_origen_id',
+            'monto'             => 'required|numeric|min:0.01',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $cuentaOrigen = CuentaFinanciera::findOrFail($request->cuenta_origen_id);
+            $cuentaDestino = CuentaFinanciera::findOrFail($request->cuenta_destino_id);
+
+            if ($cuentaOrigen->saldo_actual < $request->monto) {
+                throw new \Exception("La cuenta de origen '{$cuentaOrigen->nombre}' no tiene fondos suficientes. Saldo actual: L. " . number_format($cuentaOrigen->saldo_actual, 2));
+            }
+
+            $concepto = "Traslado de fondos desde '{$cuentaOrigen->nombre}' hacia '{$cuentaDestino->nombre}'";
+
+            // 1. Registrar egreso en cuenta origen
+            MovimientoTesoreria::create([
+                'cuenta_id' => $cuentaOrigen->id,
+                'tipo'      => 'egreso',
+                'monto'     => $request->monto,
+                'concepto'  => $concepto,
+                'usuario_id'=> Auth::id() ?? 1,
+            ]);
+            $cuentaOrigen->decrement('saldo_actual', $request->monto);
+
+            // 2. Registrar ingreso en cuenta destino
+            MovimientoTesoreria::create([
+                'cuenta_id' => $cuentaDestino->id,
+                'tipo'      => 'ingreso',
+                'monto'     => $request->monto,
+                'concepto'  => $concepto,
+                'usuario_id'=> Auth::id() ?? 1,
+            ]);
+            $cuentaDestino->increment('saldo_actual', $request->monto);
+
+            DB::commit();
+
+            return redirect()->route('tesoreria.index')->with('success', "Traslado de fondos por L. " . number_format($request->monto, 2) . " completado exitosamente.");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+    }
 }

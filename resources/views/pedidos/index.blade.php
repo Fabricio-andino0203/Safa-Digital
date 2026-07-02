@@ -278,6 +278,22 @@
                                                                             <option value="{{ $v->id }}" data-precio="{{ $v->precio }}">{{ $v->sku }} - {{ $v->nombre_completo }}</option>
                                                                         @endforeach
                                                                     </select>
+
+                                                                    <template x-if="item.producto_variante_id && variantesExtras[item.producto_variante_id] && variantesExtras[item.producto_variante_id].length > 0">
+                                                                        <div class="mt-2 space-y-1 bg-white border border-neutral-100 rounded-xl p-2">
+                                                                            <span class="text-[9px] font-bold text-neutral-400 uppercase tracking-wider block">Extras Disponibles:</span>
+                                                                            <div class="flex flex-wrap gap-1.5 mt-1">
+                                                                                <template x-for="extra in variantesExtras[item.producto_variante_id]" :key="extra.id">
+                                                                                    <label class="inline-flex items-center gap-1 px-2 py-0.5 bg-neutral-50 hover:bg-neutral-100 rounded-lg cursor-pointer transition-colors text-[10px] font-medium text-neutral-600 border border-neutral-100">
+                                                                                        <input type="checkbox" :value="extra" 
+                                                                                               @change="togglePedidoExtra(index, extra)"
+                                                                                               class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-3 h-3"/>
+                                                                                        <span x-text="extra.nombre + ' (+L. ' + Number(extra.precio).toFixed(0) + ')'"></span>
+                                                                                    </label>
+                                                                                </template>
+                                                                            </div>
+                                                                        </div>
+                                                                    </template>
                                                                 </div>
                                                             </template>
                                                             <template x-if="item.tipo_producto === 'Libre'">
@@ -832,6 +848,9 @@
             
             clientesList: @json(\App\Models\Cliente::all()),
             pedidosList: @json($pedidos->flatten()),
+            variantesExtras: @json(\App\Models\ProductoVariante::with('producto.extras')->where('activo', true)->get()->mapWithKeys(function($v) {
+                return [$v->id => $v->producto->extras];
+            })),
             pedidoSeleccionado: null,
             modalDetalles: false,
             modalConfirmarWhatsapp: false,
@@ -1125,15 +1144,36 @@
 
             cargarPrecio(index) {
                 const item = this.form.detalles[index];
+                item.extras = []; // Reiniciar extras al cambiar variante
                 if(item.tipo_producto === 'Inventario' && item.producto_variante_id) {
-                    // Buscar la option seleccionada en el select (hack rápido para Alpine.js)
                     setTimeout(() => {
-                        const select = document.querySelector(`select[x-model="item.producto_variante_id"]`);
+                        const select = document.querySelectorAll(`select[x-model="item.producto_variante_id"]`)[index];
                         if(select && select.options[select.selectedIndex]) {
                             const precio = select.options[select.selectedIndex].dataset.precio;
                             if(precio) item.precio_venta = parseFloat(precio);
                         }
                     }, 50);
+                }
+            },
+
+            togglePedidoExtra(index, extra) {
+                const item = this.form.detalles[index];
+                if (!item.extras) {
+                    item.extras = [];
+                }
+                const idx = item.extras.findIndex(e => e.id === extra.id);
+                if (idx > -1) {
+                    item.extras.splice(idx, 1);
+                } else {
+                    item.extras.push(extra);
+                }
+                
+                // Buscar select para precio base
+                const select = document.querySelectorAll(`select[x-model="item.producto_variante_id"]`)[index];
+                if(select && select.options[select.selectedIndex]) {
+                    const precioBase = parseFloat(select.options[select.selectedIndex].dataset.precio || 0);
+                    const extrasPrecio = item.extras.reduce((s, e) => s + parseFloat(e.precio), 0);
+                    item.precio_venta = precioBase + extrasPrecio;
                 }
             },
 

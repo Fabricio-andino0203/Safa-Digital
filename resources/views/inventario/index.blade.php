@@ -18,6 +18,13 @@
         <p class="text-neutral-500 text-sm mt-1">Productos base y sus variantes con stock físico / reservado / disponible.</p>
     </div>
     <div class="flex items-center gap-2">
+        <button @click="modalImportarExcel = true"
+                class="px-4 py-2.5 text-sm font-medium border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Importar Excel
+        </button>
         <button @click="abrirModalCategoria()"
                 class="px-4 py-2.5 text-sm font-medium border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors flex items-center gap-2">
             <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,6 +150,13 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                         </svg>
                     </button>
+                    <button @click="eliminarProducto(producto)"
+                            title="Eliminar producto"
+                            class="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-neutral-400 hover:text-red-600 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
@@ -227,6 +241,13 @@
                                     class="w-7 h-7 rounded-lg hover:bg-neutral-200 flex items-center justify-center text-neutral-400 hover:text-neutral-700 transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </button>
+                            <button @click="eliminarVariante(variante, producto)"
+                                    title="Eliminar variante"
+                                    class="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-neutral-400 hover:text-red-600 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
                             </button>
                         </div>
@@ -333,6 +354,47 @@
                 <textarea x-model="formProducto.descripcion" rows="2" placeholder="Descripción general del blank..."
                           class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-400 transition-colors resize-none"></textarea>
             </div>
+
+            {{-- Sección de Extras del Producto --}}
+            <div class="space-y-3">
+                <div class="flex items-center justify-between border-t border-neutral-100 pt-3">
+                    <label class="block text-sm font-semibold text-neutral-700">Extras (DTF, Sublimación, etc.)</label>
+                    <button type="button" @click="formProducto.extras.push({ nombre: '', costo: 0, precio: 0 })"
+                            class="px-2.5 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-lg hover:bg-neutral-800 transition-colors">
+                        + Agregar Extra
+                    </button>
+                </div>
+                
+                <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    <template x-for="(extra, index) in formProducto.extras" :key="index">
+                        <div class="flex gap-2 items-center">
+                            <input type="text" x-model="extra.nombre" placeholder="Nombre (ej. Estampado DTF)" required
+                                   class="flex-1 border border-neutral-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-neutral-400 bg-white"/>
+                            
+                            <div class="w-20 relative">
+                                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-neutral-400 font-semibold">C:</span>
+                                <input type="number" x-model.number="extra.costo" step="0.01" min="0" placeholder="Costo" required
+                                       class="w-full pl-5 pr-1 py-1.5 border border-neutral-200 rounded-xl text-xs text-right focus:outline-none focus:border-neutral-400 bg-white"/>
+                            </div>
+                            
+                            <div class="w-20 relative">
+                                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-neutral-400 font-semibold">P:</span>
+                                <input type="number" x-model.number="extra.precio" step="0.01" min="0" placeholder="Precio" required
+                                       class="w-full pl-5 pr-1 py-1.5 border border-neutral-200 rounded-xl text-xs text-right focus:outline-none focus:border-neutral-400 bg-white"/>
+                            </div>
+
+                            <button type="button" @click="formProducto.extras.splice(index, 1)"
+                                    class="p-1.5 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                    </template>
+                    <template x-if="!formProducto.extras || formProducto.extras.length === 0">
+                        <p class="text-[11px] text-neutral-400 text-center italic py-2">Sin extras configurados.</p>
+                    </template>
+                </div>
+            </div>
+
             <div x-show="errorForm" x-cloak class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3" x-text="errorForm"></div>
             <button @click="guardarProducto()" :disabled="guardando"
                     class="w-full py-3 bg-neutral-900 text-white font-semibold rounded-2xl hover:bg-neutral-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
@@ -588,6 +650,44 @@
     </div>
 </div>
 
+{{-- ══════════════════════════════════════════════════════════════════
+     MODAL: IMPORTAR EXCEL
+══════════════════════════════════════════════════════════════════ --}}
+<div x-show="modalImportarExcel" x-cloak
+     class="fixed inset-0 z-50 bg-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+     @keydown.escape.window="modalImportarExcel = false">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-neutral-100">
+        <div class="px-7 py-5 border-b border-neutral-100 flex items-center justify-between">
+            <h3 class="text-base font-bold text-neutral-900">Importar Productos desde Excel</h3>
+            <button @click="modalImportarExcel = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <form action="{{ route('inventario.importarExcel') }}" method="POST" enctype="multipart/form-data" class="p-7 space-y-4">
+            @csrf
+            <div>
+                <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Archivo Excel (.xlsx, .xls, .csv) *</label>
+                <input type="file" name="excel_file" accept=".xlsx, .xls, .csv" required
+                       class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-400 transition-colors file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-neutral-800 cursor-pointer"/>
+            </div>
+            <div class="text-xs text-neutral-500 bg-neutral-50 rounded-xl p-3 border border-neutral-100 space-y-1">
+                <p class="font-semibold text-neutral-700">Columnas requeridas o soportadas en la fila de cabecera:</p>
+                <ul class="list-disc list-inside pl-1 space-y-0.5">
+                    <li><span class="font-mono bg-white px-1 py-0.5 border rounded">producto</span> o <span class="font-mono bg-white px-1 py-0.5 border rounded">nombre</span> (Nombre de producto)</li>
+                    <li><span class="font-mono bg-white px-1 py-0.5 border rounded">categoria</span> (Nombre de categoría)</li>
+                    <li><span class="font-mono bg-white px-1 py-0.5 border rounded">sku</span> (Código único)</li>
+                    <li><span class="font-mono bg-white px-1 py-0.5 border rounded">color</span>, <span class="font-mono bg-white px-1 py-0.5 border rounded">talla</span> (Atributos de variante)</li>
+                    <li><span class="font-mono bg-white px-1 py-0.5 border rounded">costo</span>, <span class="font-mono bg-white px-1 py-0.5 border rounded">precio</span></li>
+                    <li><span class="font-mono bg-white px-1 py-0.5 border rounded">stock</span> o <span class="font-mono bg-white px-1 py-0.5 border rounded">stock_fisico</span></li>
+                </ul>
+            </div>
+            <button type="submit" class="w-full py-3 bg-neutral-900 text-white font-semibold rounded-2xl hover:bg-neutral-800 transition-all">
+                Importar Archivo
+            </button>
+        </form>
+    </div>
+</div>
+
 </div>
 @endsection
 
@@ -608,9 +708,10 @@ function inventarioApp() {
         modalVariante:  false,
         modalStock:     false,
         modalCategoria: false,
+        modalImportarExcel: false,
 
         // Forms
-        formProducto:  { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '' },
+        formProducto:  { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '', extras: [] },
         formVariante:  { id: null, producto_id: null, sku: '', atributos: [], costo: 0, precio: 0, stock_fisico: 0, stock_minimo: 0, imagen: '' },
         formCategoria: { nombre: '' },
         ajusteStock:   { cantidad: 0 },
@@ -671,8 +772,15 @@ function inventarioApp() {
         abrirModalProducto(producto = null) {
             this.errorForm = '';
             this.formProducto = producto
-                ? { id: producto.id, nombre: producto.nombre, categoria_id: producto.categoria_id ?? '', descripcion: producto.descripcion ?? '', imagen: producto.imagen || '' }
-                : { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '' };
+                ? { 
+                    id: producto.id, 
+                    nombre: producto.nombre, 
+                    categoria_id: producto.categoria_id ?? '', 
+                    descripcion: producto.descripcion ?? '', 
+                    imagen: producto.imagen || '',
+                    extras: producto.extras ? JSON.parse(JSON.stringify(producto.extras)) : []
+                  }
+                : { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '', extras: [] };
             this.modalProducto = true;
         },
 
@@ -690,9 +798,13 @@ function inventarioApp() {
                 if (data.success) {
                     if (this.formProducto.id) {
                         const p = this.todos.find(p => p.id === this.formProducto.id);
-                        if (p) { p.nombre = data.producto.nombre; p.categoria = data.producto.categoria?.nombre ?? 'Sin categoría'; }
+                        if (p) { 
+                            p.nombre = data.producto.nombre; 
+                            p.categoria = data.producto.categoria?.nombre ?? 'Sin categoría'; 
+                            p.extras = data.producto.extras || [];
+                        }
                     } else {
-                        this.todos.push({ ...data.producto, categoria: data.producto.categoria?.nombre ?? 'Sin categoría', variantes: [] });
+                        this.todos.push({ ...data.producto, categoria: data.producto.categoria?.nombre ?? 'Sin categoría', variantes: [], extras: data.producto.extras || [] });
                     }
                     this.filtrar();
                     this.modalProducto = false;
@@ -874,6 +986,47 @@ function inventarioApp() {
                 }
             } catch(e) { this.errorForm = 'Error de conexión.'; }
             finally { this.guardando = false; }
+        },
+
+        async eliminarProducto(producto) {
+            if (!confirm(`¿Estás seguro de que deseas eliminar el producto "${producto.nombre}"? Esto también desactivará sus variantes.`)) {
+                return;
+            }
+            try {
+                const res = await this._fetch(`/inventario/productos/${producto.id}`, 'DELETE');
+                const data = await res.json();
+                if (data.success) {
+                    this.todos = this.todos.filter(p => p.id !== producto.id);
+                    this.filtrar();
+                    this.mostrarToast('Producto eliminado correctamente.');
+                } else {
+                    alert(data.message || 'No se pudo eliminar el producto.');
+                }
+            } catch (e) {
+                this.mostrarToast('Error de conexión al eliminar.', 'error');
+            }
+        },
+
+        async eliminarVariante(variante, producto) {
+            if (!confirm(`¿Estás seguro de que deseas eliminar la variante "${variante.sku}" del producto "${producto.nombre}"?`)) {
+                return;
+            }
+            try {
+                const res = await this._fetch(`/inventario/variantes/${variante.id}`, 'DELETE');
+                const data = await res.json();
+                if (data.success) {
+                    const p = this.todos.find(p => p.id === producto.id);
+                    if (p) {
+                        p.variantes = p.variantes.filter(v => v.id !== variante.id);
+                    }
+                    this.filtrar();
+                    this.mostrarToast('Variante eliminada correctamente.');
+                } else {
+                    alert(data.message || 'No se pudo eliminar la variante.');
+                }
+            } catch (e) {
+                this.mostrarToast('Error de conexión al eliminar.', 'error');
+            }
         },
 
         // ── Helper fetch con CSRF ────────────────────────────────────────────

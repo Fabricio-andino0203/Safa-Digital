@@ -5,6 +5,7 @@
 @section('content')
 <div x-data="{
     modalMovimiento: false,
+    modalTraslado: false,
     movimientoForm: {
         cuenta_id: '',
         tipo: 'ingreso',
@@ -47,6 +48,10 @@
             <button @click="abrirMovimiento('egreso')" class="px-4 py-2.5 bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
                 Nuevo Retiro
+            </button>
+            <button @click="modalTraslado = true" class="px-4 py-2.5 bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                Traslado de Fondos
             </button>
         </div>
     </div>
@@ -233,6 +238,67 @@
                             <button type="button" @click="modalMovimiento = false" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">Cancelar</button>
                             <button type="submit" class="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm">
                                 Guardar Transacción
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Traslado de Fondos -->
+    <div x-show="modalTraslado" x-cloak class="relative z-50" x-cloak>
+        <div x-show="modalTraslado" x-transition.opacity class="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm"></div>
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div x-show="modalTraslado"
+                     @click.away="modalTraslado = false"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     class="bg-white rounded-3xl shadow-2xl w-full max-w-sm border border-neutral-100 overflow-hidden p-7 space-y-4">
+                    
+                    <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
+                        <h3 class="text-base font-bold text-neutral-900">Traslado de Fondos</h3>
+                        <button @click="modalTraslado = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <form action="{{ route('tesoreria.traslado') }}" method="POST" class="space-y-4">
+                        @csrf
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Cuenta Origen (Egreso) *</label>
+                            <select name="cuenta_origen_id" required
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer">
+                                <option value="">Seleccionar origen...</option>
+                                @foreach($cuentas as $cuenta)
+                                    <option value="{{ $cuenta->id }}">{{ $cuenta->nombre }} (Saldo: L. {{ number_format($cuenta->saldo_actual, 2) }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Cuenta Destino (Ingreso) *</label>
+                            <select name="cuenta_destino_id" required
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer">
+                                <option value="">Seleccionar destino...</option>
+                                @foreach($cuentas as $cuenta)
+                                    <option value="{{ $cuenta->id }}">{{ $cuenta->nombre }} (Saldo: L. {{ number_format($cuenta->saldo_actual, 2) }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Monto a Trasladar (L.) *</label>
+                            <input type="number" step="0.01" name="monto" min="0.01" required placeholder="0.00"
+                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"/>
+                        </div>
+
+                        <div class="pt-4 flex justify-end gap-3 border-t border-neutral-100">
+                            <button type="button" @click="modalTraslado = false" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">Cancelar</button>
+                            <button type="submit" class="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm">
+                                Confirmar Traslado
                             </button>
                         </div>
                     </form>

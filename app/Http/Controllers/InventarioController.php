@@ -17,7 +17,7 @@ class InventarioController extends Controller
 
     public function index()
     {
-        $productos  = Producto::with(['categoria', 'variantes'])->where('activo', true)->orderBy('nombre')->get();
+        $productos  = Producto::with(['categoria', 'variantes', 'extras'])->where('activo', true)->orderBy('nombre')->get();
         $categorias = Categoria::orderBy('nombre')->get();
 
         return view('inventario.index', compact('productos', 'categorias'));
@@ -34,11 +34,27 @@ class InventarioController extends Controller
             'categoria_id' => 'nullable|exists:categorias,id',
             'descripcion'  => 'nullable|string|max:1000',
             'imagen'       => 'nullable|string|max:1000',
+            'extras'       => 'nullable|array',
+            'extras.*.nombre' => 'required|string|max:255',
+            'extras.*.costo'  => 'required|numeric|min:0',
+            'extras.*.precio' => 'required|numeric|min:0',
         ]);
 
         $producto = Producto::create($validated);
 
-        return response()->json(['success' => true, 'producto' => $producto->load('categoria')]);
+        if (!empty($request->extras)) {
+            foreach ($request->extras as $extra) {
+                if (!empty($extra['nombre'])) {
+                    $producto->extras()->create([
+                        'nombre' => $extra['nombre'],
+                        'costo' => $extra['costo'],
+                        'precio' => $extra['precio'],
+                    ]);
+                }
+            }
+        }
+
+        return response()->json(['success' => true, 'producto' => $producto->load(['categoria', 'extras'])]);
     }
 
     public function updateProducto(Request $request, $id)
@@ -48,12 +64,29 @@ class InventarioController extends Controller
             'categoria_id' => 'nullable|exists:categorias,id',
             'descripcion'  => 'nullable|string|max:1000',
             'imagen'       => 'nullable|string|max:1000',
+            'extras'       => 'nullable|array',
+            'extras.*.nombre' => 'required|string|max:255',
+            'extras.*.costo'  => 'required|numeric|min:0',
+            'extras.*.precio' => 'required|numeric|min:0',
         ]);
 
         $producto = Producto::findOrFail($id);
         $producto->update($validated);
 
-        return response()->json(['success' => true, 'producto' => $producto->load('categoria')]);
+        $producto->extras()->delete();
+        if (!empty($request->extras)) {
+            foreach ($request->extras as $extra) {
+                if (!empty($extra['nombre'])) {
+                    $producto->extras()->create([
+                        'nombre' => $extra['nombre'],
+                        'costo' => $extra['costo'],
+                        'precio' => $extra['precio'],
+                    ]);
+                }
+            }
+        }
+
+        return response()->json(['success' => true, 'producto' => $producto->load(['categoria', 'extras'])]);
     }
 
     public function destroyProducto($id)
@@ -254,5 +287,19 @@ class InventarioController extends Controller
         }
 
         return response()->json(['success' => false, 'message' => 'No se subió ningún archivo'], 400);
+    }
+
+    public function importExcel(Request $request)
+    {
+        $request->validate([
+            'excel_file' => 'required|file|mimes:xlsx,xls,csv|max:4096',
+        ]);
+
+        try {
+            \Maatwebsite\Excel\Facades\Excel::import(new \App\Imports\ProductImport, $request->file('excel_file'));
+            return back()->with('success', 'Productos importados correctamente.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al importar archivo: ' . $e->getMessage());
+        }
     }
 }

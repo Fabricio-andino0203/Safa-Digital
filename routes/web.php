@@ -97,6 +97,9 @@ Route::middleware('auth')->group(function () {
         // Categorías
         Route::post('/categorias', [InventarioController::class, 'storeCategorias'])->name('storeCategorias');
 
+        // Importación de Excel
+        Route::post('/importar-excel', [InventarioController::class, 'importExcel'])->name('importarExcel');
+
         // AJAX: SKU sugerido y subida de imágenes
         Route::get('/sku-sugerido', [InventarioController::class, 'skuSugerido'])->name('skuSugerido');
         Route::post('/upload-imagen', [InventarioController::class, 'uploadImagen'])->name('uploadImagen');
@@ -142,6 +145,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('tesoreria')->name('tesoreria.')->middleware('permiso:caja')->group(function () {
         Route::get('/', [TesoreriaController::class, 'index'])->name('index');
         Route::post('/movimiento', [TesoreriaController::class, 'registrarMovimiento'])->name('movimiento');
+        Route::post('/traslado', [TesoreriaController::class, 'trasladarFondos'])->name('traslado');
     });
 
     // ─── Reportes y Auditoría ──────────────────────────────────────────────────────
@@ -159,5 +163,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/compras/pdf', [ReporteController::class, 'comprasPdf'])->name('compras.pdf');
         Route::get('/ajustes-stock/pdf', [ReporteController::class, 'ajustesStockPdf'])->name('ajustes-stock.pdf');
     });
+
+    Route::post('/notificaciones/leer-todas', function() {
+        if (auth()->check()) {
+            auth()->user()->unreadNotifications->markAsRead();
+        }
+        return back()->with('success', 'Todas las notificaciones marcadas como leídas.');
+    })->name('notificaciones.leerTodas');
 
 });

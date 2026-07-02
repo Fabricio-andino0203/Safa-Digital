@@ -31,7 +31,7 @@ class PosController extends Controller
 
         // Cargamos productos activos con variantes activas que tengan stock disponible.
         // Estructura para Alpine: array de productos, cada uno con sus variantes.
-        $productos = Producto::with(['categoria', 'variantes' => function ($q) {
+        $productos = Producto::with(['categoria', 'extras', 'variantes' => function ($q) {
             $q->where('activo', true)->orderBy('sku');
         }])
         ->where('activo', true)
@@ -46,6 +46,14 @@ class PosController extends Controller
                 'nombre'   => $producto->nombre,
                 'categoria'=> $producto->categoria?->nombre ?? 'Sin categoría',
                 'imagen'   => $producto->imagen,
+                'extras'   => $producto->extras->map(function ($e) {
+                    return [
+                        'id'     => $e->id,
+                        'nombre' => $e->nombre,
+                        'costo'  => (float) $e->costo,
+                        'precio' => (float) $e->precio,
+                    ];
+                })->values(),
                 'variantes'=> $producto->variantes->map(function ($v) {
                     return [
                         'id'               => $v->id,
@@ -204,14 +212,31 @@ class PosController extends Controller
                     );
                 }
 
-                $linea     = $variante->precio * $item['qty'];
+                $extrasCost = 0;
+                $extrasPrice = 0;
+                $extrasSnap = [];
+                if (!empty($item['extras'])) {
+                    foreach ($item['extras'] as $ex) {
+                        $extrasCost += floatval($ex['costo'] ?? 0);
+                        $extrasPrice += floatval($ex['precio'] ?? 0);
+                        $extrasSnap[] = [
+                            'nombre' => $ex['nombre'],
+                            'costo'  => floatval($ex['costo'] ?? 0),
+                            'precio' => floatval($ex['precio'] ?? 0),
+                        ];
+                    }
+                }
+
+                $precioTotal = $variante->precio + $extrasPrice;
+                $linea     = $precioTotal * $item['qty'];
                 $subtotal += $linea;
 
                 $itemsValidos[] = [
                     'variante' => $variante,
                     'cantidad' => $item['qty'],
-                    'precio'   => (float) $variante->precio,
+                    'precio'   => (float) $precioTotal,
                     'linea'    => $linea,
+                    'extras'   => $extrasSnap,
                 ];
             }
 
@@ -256,6 +281,7 @@ class PosController extends Controller
                     'precio_unitario'=> $item['precio'],
                     'descuento_linea'=> 0,
                     'subtotal'       => $item['linea'],
+                    'extras'         => $item['extras'],
                 ]);
 
                 // ✅ Venta directa: descuenta solo stock_fisico (sin reserva)

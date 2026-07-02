@@ -44,6 +44,7 @@ class PedidoController extends Controller
                 'detalles.*.descripcion_libre'    => 'nullable|string',
                 'detalles.*.cantidad'             => 'required|integer|min:1',
                 'detalles.*.precio_venta'         => 'required|numeric|min:0',
+                'detalles.*.extras'               => 'nullable|array',
 
                 // Archivos adjuntos
                 'archivos'        => 'nullable|array',
@@ -104,6 +105,7 @@ class PedidoController extends Controller
                     'cantidad'      => $item['cantidad'],
                     'precio_venta'  => $item['precio_venta'],
                     'subtotal'      => $item['cantidad'] * $item['precio_venta'],
+                    'extras'        => $item['extras'] ?? null,
                 ];
 
                 if ($item['tipo_producto'] === 'Inventario') {
@@ -144,6 +146,17 @@ class PedidoController extends Controller
             $pedido->cliente->increment('total_gastado', $validated['total_pedido']);
 
             DB::commit();
+
+            // Notificar al administrador sobre el nuevo pedido pendiente
+            $admin = \App\Models\User::find(1);
+            if ($admin) {
+                $admin->notify(new \App\Notifications\PedidoPendienteNotification(
+                    $pedido->id,
+                    $pedido->numero_orden,
+                    $pedido->cliente->nombre,
+                    $pedido->total_pedido
+                ));
+            }
 
             $whatsapp_url = '';
             if ($pedido->cliente && $pedido->cliente->telefono) {
