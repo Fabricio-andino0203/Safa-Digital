@@ -149,41 +149,44 @@ class ConfiguracionController extends Controller
     public function resetPruebas()
     {
         try {
+            DB::beginTransaction();
+
+            // Desactivar temporalmente constraints de llaves foráneas para SQLite
             DB::statement('PRAGMA foreign_keys = OFF');
 
-            // 1. Limpiar historial de ventas POS
-            DB::table('venta_pos_detalles')->delete();
-            DB::table('venta_pos')->delete();
+            // Usar Eloquent query()->delete()
+            \App\Models\VentaPosDetalle::query()->delete();
+            \App\Models\VentaPos::query()->delete();
 
-            // 2. Limpiar pedidos y relacionados
-            DB::table('pedido_archivos')->delete();
-            DB::table('pedido_historial')->delete();
-            DB::table('pedido_detalles')->delete();
-            DB::table('pedidos')->delete();
+            \App\Models\PedidoArchivo::query()->delete();
+            \App\Models\PedidoHistorial::query()->delete();
+            \App\Models\PedidoDetalle::query()->delete();
+            \App\Models\Pedido::query()->delete();
 
-            // 3. Limpiar movimientos y sesiones de caja
-            DB::table('corte_caja')->delete();
-            DB::table('caja_movimientos')->delete();
-            DB::table('caja_sesiones')->delete();
+            \App\Models\CorteCaja::query()->delete();
+            \App\Models\CajaMovimiento::query()->delete();
+            \App\Models\CajaSesion::query()->delete();
 
-            // 4. Limpiar cotizaciones
-            DB::table('cotizacion_detalles')->delete();
-            DB::table('cotizaciones')->delete();
+            \App\Models\CotizacionDetalle::query()->delete();
+            \App\Models\Cotizacion::query()->delete();
 
-            // 5. Resetear stock físico y reservado a 0 (mantiene catálogo)
-            DB::table('producto_variantes')->update([
+            // Restablecer stock físico y reservado a 0
+            \App\Models\ProductoVariante::query()->update([
                 'stock_fisico'    => 0,
                 'stock_reservado' => 0,
             ]);
 
             DB::statement('PRAGMA foreign_keys = ON');
 
+            DB::commit();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Datos de prueba eliminados correctamente. El catálogo, usuarios y configuración se mantienen intactos.',
+                'message' => 'El sistema está listo para operar en limpio.',
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),

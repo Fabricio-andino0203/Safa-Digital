@@ -34,13 +34,34 @@
             });
             const data = await res.json();
             if (data.success) {
-                alert('✅ ' + data.message);
+                Swal.fire({
+                    title: 'Datos Limpiados',
+                    text: data.message,
+                    icon: 'success',
+                    confirmButtonColor: '#000000',
+                    background: '#ffffff',
+                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+                });
                 this.modalReset = false;
             } else {
-                alert('❌ Error: ' + data.message);
+                Swal.fire({
+                    title: 'Error del Sistema',
+                    text: data.message,
+                    icon: 'error',
+                    confirmButtonColor: '#000000',
+                    background: '#ffffff',
+                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+                });
             }
         } catch(e) {
-            alert('Error de conexión.');
+            Swal.fire({
+                title: 'Error',
+                text: 'Error de conexión con el servidor.',
+                icon: 'error',
+                confirmButtonColor: '#000000',
+                background: '#ffffff',
+                customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+            });
         } finally {
             this.resetCargando = false;
             this.resetConfirmText = '';
