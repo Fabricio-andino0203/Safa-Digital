@@ -808,6 +808,11 @@
                         this.abrirDetalles(parseInt(pedidoId));
                     }, 200);
                 }
+                if (urlParams.get('crear') === 'true') {
+                    setTimeout(() => {
+                        this.openModal();
+                    }, 200);
+                }
             },
             filtroActual: 'todos',
             openSlideOver: false,
