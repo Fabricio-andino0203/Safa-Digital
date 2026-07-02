@@ -13,6 +13,14 @@ class ConfiguracionController extends Controller
 {
     public function index()
     {
+        if (MensajePlantilla::count() === 0) {
+            (new \Database\Seeders\PlantillasSeeder())->run();
+        }
+
+        if (Configuracion::count() === 0) {
+            (new \Database\Seeders\ConfiguracionSeeder())->run();
+        }
+
         $configs = Configuracion::pluck('valor', 'llave')->toArray();
         $plantillas = MensajePlantilla::all();
         $usuarios = \App\Models\User::all();

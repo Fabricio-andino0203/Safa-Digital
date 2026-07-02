@@ -21,6 +21,10 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $this->call(CuentasFinancierasSeeder::class);
+        $this->call([
+            CuentasFinancierasSeeder::class,
+            ConfiguracionSeeder::class,
+            PlantillasSeeder::class,
+        ]);
     }
 }
