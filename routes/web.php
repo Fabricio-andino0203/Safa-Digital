@@ -53,6 +53,26 @@ Route::middleware('auth')->group(function () {
         Route::get('/archivos/{id}/descargar', [PedidoController::class, 'descargarArchivo'])->name('archivos.descargar');
     });
 
+    Route::get('/pedidos/{id}/descargar', function ($id) {
+        $archivo = \App\Models\PedidoArchivo::find($id);
+        if ($archivo) {
+            $ruta = str_replace('storage/', '', $archivo->ruta);
+            if (\Storage::disk('public')->exists($ruta)) {
+                return \Storage::disk('public')->download($ruta, $archivo->nombre_original);
+            }
+        }
+        
+        $pedido = \App\Models\Pedido::find($id);
+        if ($pedido && $pedido->adjunto) {
+            $ruta = str_replace('storage/', '', $pedido->adjunto);
+            if (\Storage::disk('public')->exists($ruta)) {
+                return \Storage::disk('public')->download($ruta);
+            }
+        }
+        
+        abort(404, 'Archivo no encontrado');
+    })->name('pedidos.descargar');
+
     // ─── Configuración Global ──────────────────────────────────────────────────
     Route::prefix('configuracion')->name('configuracion.')->middleware('permiso:configuracion')->group(function () {
         Route::get('/', [\App\Http\Controllers\ConfiguracionController::class, 'index'])->name('index');

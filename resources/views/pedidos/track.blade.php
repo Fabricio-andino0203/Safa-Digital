@@ -121,7 +121,7 @@
                         <div class="flex flex-col">
                             <span class="text-sm font-bold text-neutral-800">{{ $historial->estado_nuevo }}</span>
                             <span class="text-xs text-neutral-400 mt-0.5">
-                                {{ \Carbon\Carbon::parse($historial->pivot->created_at ?? $historial->created_at, 'UTC')->setTimezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}
+                                {{ $historial->hora_honduras }}
                             </span>
                         </div>
                     </div>

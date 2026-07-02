@@ -26,6 +26,12 @@ class PedidoHistorial extends Model
         'created_at' => 'datetime',
     ];
 
+    public function getHoraHondurasAttribute() {
+        return (new \DateTime($this->pivot->created_at ?? $this->created_at, new \DateTimeZone('UTC')))
+               ->setTimezone(new \DateTimeZone('America/Tegucigalpa'))
+               ->format('d/m/Y h:i A');
+    }
+
     public function pedido(): BelongsTo
     {
         return $this->belongsTo(Pedido::class);

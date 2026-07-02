@@ -663,6 +663,14 @@
                             <span class="text-xs font-bold text-neutral-900" x-text="'+L. ' + Number(extra.precio).toFixed(2)"></span>
                         </label>
                     </template>
+                    @if(isset($productoParaExtras) && is_object($productoParaExtras))
+                        @foreach($productoParaExtras->extras as $extra)
+                            <div class="flex items-center hidden">
+                                <input type="checkbox" wire:model.live="selectedExtras" value="{{ $extra->id }}">
+                                <label>{{ $extra->nombre }}</label>
+                            </div>
+                        @endforeach
+                    @endif
                 </div>
 
                 <button @click="confirmarExtrasYAgregar()"
