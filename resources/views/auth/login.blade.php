@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @php $favicon = get_setting('favicon_ruta'); @endphp
+    @if($favicon && file_exists(public_path($favicon)))
+        <link rel="icon" href="{{ asset($favicon) }}?v={{ time() }}">
+    @else
+        <link rel="icon" href="{{ asset('favicon.ico') }}">
+    @endif
     <title>Safa Digital - Ingreso</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>

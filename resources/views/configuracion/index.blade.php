@@ -73,21 +73,42 @@
                     </div>
                 </div>
                 
-                <div class="pt-6 border-t border-neutral-100">
-                    <label class="block text-sm font-bold text-neutral-800 mb-4">Logo Oficial (Impresión y Tickets)</label>
-                    <div class="flex items-center gap-6">
-                        @if(isset($configs['logo_ruta']) && file_exists(public_path($configs['logo_ruta'])))
-                            <div class="w-24 h-24 rounded-xl border border-neutral-200 bg-neutral-50 flex items-center justify-center p-2">
-                                <img src="{{ asset($configs['logo_ruta']) }}?v={{ time() }}" alt="Logo" class="max-w-full max-h-full object-contain">
+                <div class="pt-6 border-t border-neutral-100 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <label class="block text-sm font-bold text-neutral-800 mb-4">Logo Oficial (Impresión y Tickets)</label>
+                        <div class="flex items-center gap-6">
+                            @if(isset($configs['logo_ruta']) && file_exists(public_path($configs['logo_ruta'])))
+                                <div class="w-24 h-24 rounded-xl border border-neutral-200 bg-neutral-50 flex items-center justify-center p-2">
+                                    <img src="{{ asset($configs['logo_ruta']) }}?v={{ time() }}" alt="Logo" class="max-w-full max-h-full object-contain">
+                                </div>
+                            @else
+                                <div class="w-24 h-24 rounded-xl border border-neutral-200 border-dashed bg-neutral-50 flex items-center justify-center p-2 text-neutral-400 text-xs text-center">
+                                    Sin Logo
+                                </div>
+                            @endif
+                            <div class="flex-1">
+                                <input type="file" name="logo" accept="image/png, image/jpeg, image/svg+xml" class="block w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-neutral-800 cursor-pointer">
+                                <p class="mt-2 text-xs text-neutral-500">Recomendado: PNG o SVG. Máx 2MB.</p>
                             </div>
-                        @else
-                            <div class="w-24 h-24 rounded-xl border border-neutral-200 border-dashed bg-neutral-50 flex items-center justify-center p-2 text-neutral-400 text-xs text-center">
-                                Sin Logo
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-neutral-800 mb-4">Favicon (Icono de Pestaña)</label>
+                        <div class="flex items-center gap-6">
+                            @if(isset($configs['favicon_ruta']) && file_exists(public_path($configs['favicon_ruta'])))
+                                <div class="w-24 h-24 rounded-xl border border-neutral-200 bg-neutral-50 flex items-center justify-center p-2">
+                                    <img src="{{ asset($configs['favicon_ruta']) }}?v={{ time() }}" alt="Favicon" class="max-w-full max-h-full object-contain">
+                                </div>
+                            @else
+                                <div class="w-24 h-24 rounded-xl border border-neutral-200 border-dashed bg-neutral-50 flex items-center justify-center p-2 text-neutral-400 text-xs text-center">
+                                    Sin Favicon
+                                </div>
+                            @endif
+                            <div class="flex-1">
+                                <input type="file" name="favicon" accept="image/png, image/x-icon, image/svg+xml, image/jpeg" class="block w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-neutral-800 cursor-pointer">
+                                <p class="mt-2 text-xs text-neutral-500">Soportados: ICO, PNG o SVG. Máx 1MB.</p>
                             </div>
-                        @endif
-                        <div class="flex-1">
-                            <input type="file" name="logo" accept="image/png, image/jpeg" class="block w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-neutral-800 cursor-pointer">
-                            <p class="mt-2 text-xs text-neutral-500">Recomendado: PNG con fondo transparente. Máx 2MB.</p>
                         </div>
                     </div>
                 </div>

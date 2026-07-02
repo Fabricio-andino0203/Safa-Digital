@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @php $favicon = get_setting('favicon_ruta'); @endphp
+    @if($favicon && file_exists(public_path($favicon)))
+        <link rel="icon" href="{{ asset($favicon) }}?v={{ time() }}">
+    @else
+        <link rel="icon" href="{{ asset('favicon.ico') }}">
+    @endif
     <title>Safa Digital</title>
     <!-- Tailwind CSS CDN para renderizado rápido -->
     <script src="https://cdn.tailwindcss.com"></script>

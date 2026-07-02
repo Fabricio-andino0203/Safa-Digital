@@ -33,7 +33,8 @@ class ConfiguracionController extends Controller
             'nombre_comercial' => 'required|string',
             'telefono' => 'required|string',
             'direccion' => 'required|string',
-            'logo' => 'nullable|file|mimes:jpeg,png,jpg,svg|max:2048'
+            'logo' => 'nullable|file|mimes:jpeg,png,jpg,svg|max:2048',
+            'favicon' => 'nullable|file|mimes:jpeg,png,jpg,svg,ico|max:1024'
         ]);
 
         $this->saveSetting('empresa', 'nombre_comercial', $request->nombre_comercial, 'texto');
@@ -85,6 +86,12 @@ class ConfiguracionController extends Controller
             }
             
             $this->saveSetting('sistema', 'logo_ruta', 'storage/' . $ruta, 'imagen');
+        }
+
+        if ($request->hasFile('favicon')) {
+            $file = $request->file('favicon');
+            $ruta = $file->store('config', 'public');
+            $this->saveSetting('sistema', 'favicon_ruta', 'storage/' . $ruta, 'imagen');
         }
 
         return back()->with('success', 'Configuración de empresa actualizada.');
