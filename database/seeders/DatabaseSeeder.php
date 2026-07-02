@@ -10,17 +10,16 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Limpiar usuarios antiguos
-        User::truncate();
-
         // Crear administrador por defecto con username
-        User::create([
-            'name'     => 'Administrador',
-            'username' => 'admin',
-            'password' => Hash::make('admin123'),
-            'rol'      => 'admin',
-            'permisos' => ['pedidos', 'pos', 'clientes', 'cotizaciones', 'inventario', 'compras', 'caja', 'configuracion'],
-        ]);
+        User::firstOrCreate(
+            ['username' => 'admin'],
+            [
+                'name'     => 'Administrador',
+                'password' => bcrypt('12345678'),
+                'rol'      => 'admin',
+                'permisos' => ['pedidos', 'pos', 'clientes', 'cotizaciones', 'inventario', 'compras', 'caja', 'configuracion', 'reportes'],
+            ]
+        );
 
         $this->call(CuentasFinancierasSeeder::class);
     }
