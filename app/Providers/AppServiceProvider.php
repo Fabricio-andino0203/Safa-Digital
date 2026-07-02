@@ -21,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        date_default_timezone_set('America/Tegucigalpa');
+        \Carbon\Carbon::setLocale('es');
+
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
         }

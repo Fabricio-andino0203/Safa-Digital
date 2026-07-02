@@ -34,7 +34,7 @@
         <div class="text-center mb-6">
             <h2 class="text-sm font-medium text-neutral-500 uppercase tracking-wider">Orden</h2>
             <div class="text-3xl font-extrabold text-neutral-900">#{{ $pedido->numero_orden }}</div>
-            <div class="text-xs text-neutral-400 mt-1">Registrado: {{ $pedido->created_at->timezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}</div>
+            <div class="text-xs text-neutral-400 mt-1">Registrado: {{ \Carbon\Carbon::parse($pedido->created_at)->timezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}</div>
             
             <!-- Badge de Estado de Pago -->
             <div class="mt-3">
@@ -122,7 +122,7 @@
                             <span class="text-sm font-bold text-neutral-800">{{ $historial->estado_nuevo }}</span>
                             <span class="text-xs text-neutral-400 mt-0.5">
                                 {{-- Forzar zona horaria America/Tegucigalpa --}}
-                                {{ $historial->created_at->timezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}
+                                {{ \Carbon\Carbon::parse($historial->created_at)->timezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}
                             </span>
                         </div>
                     </div>
