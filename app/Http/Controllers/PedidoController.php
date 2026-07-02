@@ -357,11 +357,7 @@ class PedidoController extends Controller
 
     public function track($numero_orden)
     {
-        $pedido = Pedido::with([
-                'cliente',
-                'detalles.variante.producto',
-                'historiales.usuario',
-            ])
+        $pedido = Pedido::with(['cliente', 'detalles.variante.producto', 'historiales.usuario', 'movimientosCaja'])
             ->where('numero_orden', $numero_orden)
             ->first();
 
