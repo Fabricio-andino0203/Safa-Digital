@@ -990,15 +990,38 @@ function posApp() {
                     if (data.ticket_url) {
                         window.open(data.ticket_url, '_blank');
                     }
-                    alert('Pago de pedido registrado con éxito. Cambio: L.' + (data.cambio || 0).toFixed(2));
                     this.modalCobroPedido = false;
                     this.ventaExitosa = true; // Mostrar confetti o recargar
-                    window.location.reload();
+                    
+                    Swal.fire({
+                        title: 'Pago Registrado',
+                        text: 'Pago de pedido registrado con éxito. Cambio: L.' + (data.cambio || 0).toFixed(2),
+                        icon: 'success',
+                        confirmButtonColor: '#000000',
+                        background: '#ffffff',
+                        customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+                    }).then(() => {
+                        window.location.reload();
+                    });
                 } else {
-                    alert(data.message || 'Error al procesar el pago del pedido.');
+                    Swal.fire({
+                        title: 'Error',
+                        text: data.message || 'Error al procesar el pago del pedido.',
+                        icon: 'error',
+                        confirmButtonColor: '#000000',
+                        background: '#ffffff',
+                        customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+                    });
                 }
             } catch (e) {
-                alert('Error de conexión al procesar el pago.');
+                Swal.fire({
+                    title: 'Error de Conexión',
+                    text: 'Error de conexión al procesar el pago.',
+                    icon: 'error',
+                    confirmButtonColor: '#000000',
+                    background: '#ffffff',
+                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
+                });
             } finally {
                 this.cargandoPagoPedido = false;
             }
