@@ -354,6 +354,7 @@
                     </div>
                 </div>
 
+                <!-- EFECTIVO -->
                 <div x-show="metodoPago === 'efectivo'" x-transition class="bg-neutral-50 rounded-2xl p-5 border border-neutral-100 space-y-4">
                     <div>
                         <label class="block text-sm font-semibold text-neutral-700 mb-2">Monto Entregado ($)</label>
@@ -368,10 +369,62 @@
                     <p x-show="montoEntregado > 0 && cambio < 0" class="text-xs text-red-500 font-medium">⚠️ El monto es menor al total.</p>
                 </div>
 
+                <!-- TARJETA / TRANSFERENCIA -->
+                <div x-show="metodoPago === 'tarjeta' || metodoPago === 'transferencia'" x-transition class="bg-neutral-50 rounded-2xl p-5 border border-neutral-100 space-y-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-neutral-700 mb-2">Referencia de Transacción / Voucher</label>
+                        <input type="text" x-model="referenciaPago" placeholder="Ej. Ref-123456"
+                               class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 text-center font-bold"/>
+                    </div>
+                    <div class="pt-2 border-t border-neutral-200 flex items-center justify-between">
+                        <span class="text-sm font-semibold text-neutral-700">Monto a Cobrar</span>
+                        <span class="text-xl font-bold text-neutral-900" x-text="'L.' + total.toFixed(2)"></span>
+                    </div>
+                </div>
+
+                <!-- MIXTO -->
+                <div x-show="metodoPago === 'mixto'" x-transition class="bg-neutral-50 rounded-2xl p-5 border border-neutral-100 space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-neutral-500 mb-1">Monto en Efectivo</label>
+                            <input type="number" x-model.number="montoEfectivo" min="0" step="0.01" @focus="$event.target.select()"
+                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-gray-800 shadow-sm text-center font-bold" placeholder="0.00"/>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-neutral-500 mb-1">Monto Digital</label>
+                            <input type="number" x-model.number="montoDigital" min="0" step="0.01" @focus="$event.target.select()"
+                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-gray-800 shadow-sm text-center font-bold" placeholder="0.00"/>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-neutral-500 mb-1">Método Digital</label>
+                            <select x-model="metodoDigital" class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-gray-800 shadow-sm cursor-pointer">
+                                <option value="tarjeta">💳 Tarjeta</option>
+                                <option value="transferencia">🏦 Transferencia</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-neutral-500 mb-1">Referencia Digital</label>
+                            <input type="text" x-model="referenciaDigital" placeholder="Ej. Ref-9999"
+                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-gray-800 shadow-sm text-center font-bold"/>
+                        </div>
+                    </div>
+                    <div class="pt-3 border-t border-neutral-200 flex items-center justify-between text-xs">
+                        <span class="font-semibold text-neutral-600">Suma Cubierta:</span>
+                        <span class="font-bold text-neutral-900" x-text="'L.' + (Number(montoEfectivo || 0) + Number(montoDigital || 0)).toFixed(2) + ' / L.' + total.toFixed(2)"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm font-bold pt-1">
+                        <span>Cambio a devolver:</span>
+                        <span class="text-green-600" x-text="'L.' + Math.max(0, (Number(montoEfectivo || 0) + Number(montoDigital || 0)) - total).toFixed(2)"></span>
+                    </div>
+                    <p x-show="(Number(montoEfectivo || 0) + Number(montoDigital || 0)) < total" class="text-xs text-red-500 font-medium">⚠️ La suma de montos es menor al total.</p>
+                </div>
+
                 <div x-show="errorCobro" x-cloak class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3" x-text="errorCobro"></div>
 
                 <button @click="cobrar()"
-                        :disabled="cargandoCobro || (metodoPago === 'efectivo' && montoEntregado > 0 && cambio < 0)"
+                        :disabled="cargandoCobro || (metodoPago === 'efectivo' && (montoEntregado <= 0 || cambio < 0)) || (metodoPago === 'mixto' && ((Number(montoEfectivo || 0) + Number(montoDigital || 0)) < total))"
                         class="w-full py-4 bg-neutral-900 text-white font-bold rounded-2xl hover:bg-neutral-800 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
                     <svg x-show="cargandoCobro" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -474,9 +527,10 @@
                             </template>
                         </div>
                         
+                        <!-- EFECTIVO -->
                         <div x-show="metodoPago === 'efectivo'" class="bg-neutral-50 rounded-2xl p-4 border border-neutral-100">
                             <label class="block text-sm font-semibold text-neutral-700 mb-2">Monto Entregado / Abono ($)</label>
-                            <input type="number" x-model.number="montoEntregado" min="0" step="0.01" 
+                            <input type="number" x-model.number="montoEntregado" min="0" step="0.01" @focus="$event.target.select()"
                                    class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 text-center text-xl font-bold"/>
                             
                             <div class="mt-3 flex justify-between items-center text-sm font-bold">
@@ -490,11 +544,64 @@
                             </div>
                         </div>
 
+                        <!-- TARJETA / TRANSFERENCIA -->
+                        <div x-show="metodoPago === 'tarjeta' || metodoPago === 'transferencia'" class="bg-neutral-50 rounded-2xl p-4 border border-neutral-100 space-y-3">
+                            <div>
+                                <label class="block text-sm font-semibold text-neutral-700 mb-2">Referencia de Transacción / Voucher</label>
+                                <input type="text" x-model="referenciaPago" placeholder="Ej. Ref-12345"
+                                       class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2 text-sm text-gray-800 shadow-sm text-center font-bold"/>
+                            </div>
+                            <div class="pt-2 border-t border-neutral-200 flex justify-between items-center text-sm font-bold">
+                                <span>Monto a Liquidar:</span>
+                                <span class="text-xl text-neutral-900" x-text="'L.' + Number(pedidoEncontrado?.saldo_pendiente || 0).toFixed(2)"></span>
+                            </div>
+                        </div>
+
+                        <!-- MIXTO -->
+                        <div x-show="metodoPago === 'mixto'" class="bg-neutral-50 rounded-2xl p-4 border border-neutral-100 space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-neutral-500 mb-1">Monto en Efectivo</label>
+                                    <input type="number" x-model.number="montoEfectivo" min="0" step="0.01" @focus="$event.target.select()"
+                                           class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm text-gray-800 shadow-sm text-center font-bold" placeholder="0.00"/>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-neutral-500 mb-1">Monto Digital</label>
+                                    <input type="number" x-model.number="montoDigital" min="0" step="0.01" @focus="$event.target.select()"
+                                           class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm text-gray-800 shadow-sm text-center font-bold" placeholder="0.00"/>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-neutral-500 mb-1">Método Digital</label>
+                                    <select x-model="metodoDigital" class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm text-gray-800 shadow-sm cursor-pointer">
+                                        <option value="tarjeta">💳 Tarjeta</option>
+                                        <option value="transferencia">🏦 Transferencia</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-neutral-500 mb-1">Referencia Digital</label>
+                                    <input type="text" x-model="referenciaDigital" placeholder="Ej. Ref-9999"
+                                           class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-1.5 text-sm text-gray-800 shadow-sm text-center font-bold"/>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-neutral-200 flex justify-between items-center text-xs font-semibold">
+                                <span>Suma Cubierta:</span>
+                                <span x-text="'L.' + (Number(montoEfectivo || 0) + Number(montoDigital || 0)).toFixed(2) + ' / L.' + Number(pedidoEncontrado?.saldo_pendiente || 0).toFixed(2)"></span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm font-bold">
+                                <span>Cambio a devolver:</span>
+                                <span class="text-green-600" x-text="'L.' + Math.max(0, (Number(montoEfectivo || 0) + Number(montoDigital || 0)) - Number(pedidoEncontrado?.saldo_pendiente || 0)).toFixed(2)"></span>
+                            </div>
+                            <p x-show="(Number(montoEfectivo || 0) + Number(montoDigital || 0)) < Number(pedidoEncontrado?.saldo_pendiente || 0)" class="text-xs text-red-500 font-medium">⚠️ La suma de montos es menor al saldo pendiente.</p>
+                        </div>
+
                         <div class="flex gap-3 mt-6">
                             <button @click="pedidoEncontrado = null; busquedaPedidoTerm = ''" class="px-6 py-4 bg-white border border-neutral-200 text-neutral-700 font-bold rounded-2xl hover:bg-neutral-50 transition-colors">Volver a Lista</button>
-                            <button @click="pagarPedidoAction()" :disabled="cargandoPagoPedido || (metodoPago === 'efectivo' && montoEntregado <= 0)"
+                            <button @click="pagarPedidoAction()" 
+                                    :disabled="cargandoPagoPedido || (metodoPago === 'efectivo' && montoEntregado <= 0) || (metodoPago === 'mixto' && ((Number(montoEfectivo || 0) + Number(montoDigital || 0)) < Number(pedidoEncontrado?.saldo_pendiente || 0)))"
                                     class="flex-1 py-4 bg-neutral-900 text-white font-bold rounded-2xl hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span x-text="cargandoPagoPedido ? 'Procesando...' : (montoEntregado >= pedidoEncontrado?.saldo_pendiente ? 'Liquidar y Entregar' : 'Registrar Abono')"></span>
+                                <span x-text="cargandoPagoPedido ? 'Procesando...' : (montoEntregado >= pedidoEncontrado?.saldo_pendiente || (metodoPago === 'mixto' && (Number(montoEfectivo || 0) + Number(montoDigital || 0)) >= pedidoEncontrado?.saldo_pendiente) || metodoPago === 'tarjeta' || metodoPago === 'transferencia' ? 'Liquidar y Entregar' : 'Registrar Abono')"></span>
                             </button>
                         </div>
                     </div>
@@ -582,27 +689,56 @@
                     </div>
 
                     <div class="space-y-4">
-                        <div class="bg-neutral-50 rounded-2xl p-4 border border-neutral-200 space-y-3">
+                        <!-- Desglose de saldos del Corte -->
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="bg-neutral-50 rounded-xl p-3 border border-neutral-100">
+                                <span class="text-neutral-400 font-semibold uppercase tracking-wider block">Fondo Inicial</span>
+                                <span class="text-base font-bold text-neutral-900" x-text="'L. ' + Number(corteDesglose.fondo_inicial).toFixed(2)"></span>
+                            </div>
+                            <div class="bg-neutral-50 rounded-xl p-3 border border-neutral-100">
+                                <span class="text-neutral-400 font-semibold uppercase tracking-wider block">Ventas Efectivo</span>
+                                <span class="text-base font-bold text-neutral-900" x-text="'L. ' + Number(corteDesglose.ventas_efectivo).toFixed(2)"></span>
+                            </div>
+                            <div class="bg-neutral-50 rounded-xl p-3 border border-neutral-100">
+                                <span class="text-neutral-400 font-semibold uppercase tracking-wider block">Ingresos a Bancos</span>
+                                <span class="text-base font-bold text-neutral-600" x-text="'L. ' + Number(corteDesglose.ingresos_bancos).toFixed(2)"></span>
+                            </div>
+                            <div class="bg-neutral-50 rounded-xl p-3 border border-neutral-100">
+                                <span class="text-neutral-400 font-semibold uppercase tracking-wider block">Egresos / Retiros</span>
+                                <span class="text-base font-bold text-red-500" x-text="'L. ' + Number(corteDesglose.egresos).toFixed(2)"></span>
+                            </div>
+                        </div>
+
+                        <div class="bg-neutral-900 text-white rounded-2xl p-4 border border-neutral-800">
+                            <span class="text-xs font-bold text-neutral-400 uppercase tracking-wider block">Efectivo Físico Esperado</span>
+                            <span class="text-2xl font-black mt-1 block" x-text="'L. ' + Number(corteDesglose.total_esperado).toFixed(2)"></span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <span class="text-[10px] font-extrabold text-neutral-400 uppercase tracking-widest block">Efectivo Esperado en Gaveta</span>
-                                <span class="text-2xl font-black text-neutral-900 mt-0.5" x-text="'L. ' + Number(dineroEsperado).toFixed(2)"></span>
+                                <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Efectivo Real (Arqueo) *</label>
+                                <input type="number" step="0.01" x-model.number="efectivoReal" min="0" placeholder="0.00"
+                                       class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-gray-800 shadow-sm text-center font-bold"/>
                             </div>
-                            <div class="border-t border-neutral-200/60 pt-2 flex justify-between items-center text-xs">
-                                <span class="font-semibold text-neutral-500">Cobros Digitales Hoy (Bancos):</span>
-                                <span class="font-bold text-neutral-800" x-text="'L. ' + Number(digitalHoy).toFixed(2)"></span>
+                            <div>
+                                <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Retirar a Tesorería *</label>
+                                <input type="number" step="0.01" x-model.number="montoARetirar" min="0" placeholder="0.00"
+                                       class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-gray-800 shadow-sm text-center font-bold"/>
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Efectivo Real en Caja (Arqueo) *</label>
-                            <input type="number" step="0.01" x-model.number="efectivoReal" min="0" placeholder="0.00"
-                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"/>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Monto a Retirar hacia Tesorería *</label>
-                            <input type="number" step="0.01" x-model.number="montoARetirar" min="0" placeholder="0.00"
-                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"/>
+                        <div class="grid grid-cols-2 gap-3 text-xs font-bold">
+                            <!-- Diferencia -->
+                            <div class="p-3 rounded-xl border flex flex-col"
+                                 :class="diferenciaCorte >= 0 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'">
+                                <span class="uppercase tracking-wider text-[10px] text-neutral-400">Diferencia</span>
+                                <span class="text-base font-black" x-text="(diferenciaCorte >= 0 ? '+' : '') + 'L. ' + Number(diferenciaCorte).toFixed(2)"></span>
+                            </div>
+                            <!-- Fondo Remanente -->
+                            <div class="p-3 rounded-xl border bg-neutral-50 border-neutral-200 text-neutral-800 flex flex-col">
+                                <span class="uppercase tracking-wider text-[10px] text-neutral-400">Remanente de Caja</span>
+                                <span class="text-base font-black" x-text="'L. ' + Number(Math.max(0, efectivoReal - montoARetirar)).toFixed(2)"></span>
+                            </div>
                         </div>
 
                         <div>
@@ -611,14 +747,9 @@
                                       class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"></textarea>
                         </div>
 
-                        <div x-show="efectivoReal > 0" class="text-sm font-bold p-3 rounded-xl flex justify-between items-center bg-neutral-100 border border-neutral-200 text-neutral-800">
-                            <span>Fondo que queda en caja:</span>
-                            <span class="text-lg font-black" x-text="'L. ' + Number(Math.max(0, efectivoReal - montoARetirar)).toFixed(2)"></span>
-                        </div>
-
                         <div x-show="errorCorte" class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5" x-text="errorCorte"></div>
 
-                        <button @click="procesarCorteCaja()" :disabled="cargandoCorte || efectivoReal <= 0"
+                        <button @click="procesarCorteCaja()" :disabled="cargandoCorte || efectivoReal === '' || efectivoReal === null"
                                 class="w-full py-3.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-2xl disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-2">
                             <svg x-show="cargandoCorte" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -657,20 +788,15 @@
                     <template x-for="extra in (productoParaExtras?.extras || [])" :key="extra.id">
                         <label class="flex items-center justify-between p-3 bg-neutral-50 hover:bg-neutral-100/75 rounded-xl cursor-pointer transition-colors border border-neutral-100">
                             <div class="flex items-center gap-3">
-                                <input type="checkbox" :value="extra.id" x-model="$wire.selectedExtras" class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-4 h-4" />
+                                <input type="checkbox" 
+                                       :checked="extrasSeleccionados.some(e => e.id === extra.id)"
+                                       @change="if ($event.target.checked) { extrasSeleccionados.push(extra); } else { extrasSeleccionados = extrasSeleccionados.filter(e => e.id !== extra.id); }"
+                                       class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-4 h-4"/>
                                 <span class="text-xs font-semibold text-neutral-700" x-text="extra.nombre"></span>
                             </div>
                             <span class="text-xs font-bold text-neutral-900" x-text="'+L. ' + Number(extra.precio).toFixed(2)"></span>
                         </label>
                     </template>
-                    @if(isset($productoParaExtras) && is_object($productoParaExtras))
-                        @foreach($productoParaExtras->extras as $extra)
-                            <div class="flex items-center hidden">
-                                <input type="checkbox" wire:model.live="selectedExtras" value="{{ $extra->id }}">
-                                <label>{{ $extra->nombre }}</label>
-                            </div>
-                        @endforeach
-                    @endif
                 </div>
 
                 <button @click="confirmarExtrasYAgregar()"
@@ -679,6 +805,19 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- Toast Notification Banner -->
+    <div x-data="{ show: false, message: '', type: 'success' }"
+         @show-toast.window="message = $event.detail.message; type = $event.detail.type || 'success'; show = true; setTimeout(() => show = false, 3500)"
+         x-show="show"
+         x-transition
+         x-cloak
+         class="fixed bottom-5 right-5 z-[100] max-w-sm rounded-2xl shadow-xl border p-4 flex items-center gap-3 transition-all duration-300"
+         :class="type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'">
+        <span x-show="type === 'success'" class="text-lg font-bold">✓</span>
+        <span x-show="type === 'error'" class="text-lg font-bold">⚠️</span>
+        <p class="text-xs font-semibold" x-text="message"></p>
     </div>
 
 </div>
@@ -697,7 +836,7 @@ function posApp() {
         // Sesión
         sesionActiva:    {{ $sesion ? 'true' : 'false' }},
         sesionId:        {{ $sesion ? $sesion->id : 'null' }},
-        montoInicial:    0,
+        montoInicial:    @js($fondoSugerido ?? 0.00),
         cargandoApertura: false,
         errorApertura:   '',
         clientes:        @json($clientes),
@@ -712,9 +851,12 @@ function posApp() {
         // Corte de Caja
         modalCorte: false,
         dineroEsperado: @js($dineroEsperado),
-        digitalHoy: @js($digitalHoy),
-        $wire: {
-            selectedExtras: []
+        corteDesglose: {
+            fondo_inicial: 0,
+            ventas_efectivo: 0,
+            ingresos_bancos: 0,
+            egresos: 0,
+            total_esperado: @js($dineroEsperado)
         },
         efectivoReal: 0,
         montoARetirar: 0,
@@ -745,6 +887,12 @@ function posApp() {
         openCobro:      false,
         metodoPago:     'efectivo',
         montoEntregado: 0,
+        // Variables para Card/Transfer/Mixed
+        referenciaPago: '',
+        montoEfectivo: 0,
+        montoDigital: 0,
+        metodoDigital: 'tarjeta',
+        referenciaDigital: '',
         metodos: [
             { v: 'efectivo',      label: 'Efectivo',      icon: '💵' },
             { v: 'tarjeta',       label: 'Tarjeta',       icon: '💳' },
@@ -770,6 +918,7 @@ function posApp() {
         get subtotal() { return this.carrito.reduce((s, i) => s + i.precio * i.qty, 0); },
         get total()    { return Math.max(0, this.subtotal - this.descuento); },
         get cambio()   { return this.montoEntregado - this.total; },
+        get diferenciaCorte() { return this.efectivoReal - this.corteDesglose.total_esperado; },
 
         // ── Init ─────────────────────────────────────────────────────────────
         init() {
@@ -785,6 +934,11 @@ function posApp() {
                 this.errorBusquedaPedido = '';
                 this.metodoPago = 'efectivo';
                 this.montoEntregado = 0;
+                this.referenciaPago = '';
+                this.montoEfectivo = 0;
+                this.montoDigital = 0;
+                this.metodoDigital = 'tarjeta';
+                this.referenciaDigital = '';
                 setTimeout(() => document.getElementById('inp-buscar-pedido')?.focus(), 100);
             });
             window.addEventListener('abrir-corte-caja', () => {
@@ -793,23 +947,25 @@ function posApp() {
                 this.montoARetirar = 0;
                 this.notasCorte = '';
                 this.errorCorte = '';
+                this.actualizarTotalesCaja();
             });
-            window.addEventListener('venta-completada', e => {
-                if (e.detail) {
-                    if (e.detail.metodo_pago === 'efectivo') {
-                        this.dineroEsperado = parseFloat(this.dineroEsperado || 0) + parseFloat(e.detail.total || 0);
-                    } else if (['transferencia', 'tarjeta'].includes(e.detail.metodo_pago)) {
-                        this.digitalHoy = parseFloat(this.digitalHoy || 0) + parseFloat(e.detail.total || 0);
-                    } else if (e.detail.metodo_pago === 'mixto') {
-                        // En mixto, el efectivo es montoEntregado y el remanente es digital
-                        const totalVenta = parseFloat(e.detail.total || 0);
-                        const efec = Math.min(totalVenta, parseFloat(this.montoEntregado || 0));
-                        const dig = Math.max(0.00, totalVenta - efec);
-                        this.dineroEsperado = parseFloat(this.dineroEsperado || 0) + efec;
-                        this.digitalHoy = parseFloat(this.digitalHoy || 0) + dig;
-                    }
+            window.addEventListener('transaccion-procesada', () => {
+                this.actualizarTotalesCaja();
+            });
+        },
+
+        async actualizarTotalesCaja() {
+            if (!this.sesionId) return;
+            try {
+                const res = await fetch(`{{ route('pos.sesion.totales') }}?caja_sesion_id=${this.sesionId}`);
+                const data = await res.json();
+                if (data.success) {
+                    this.corteDesglose = data.totales;
+                    this.dineroEsperado = data.totales.total_esperado;
                 }
-            });
+            } catch (e) {
+                console.error("Error al actualizar totales de caja:", e);
+            }
         },
 
         // ── Productos / Filtrar ──────────────────────────────────────────────
@@ -846,7 +1002,6 @@ function posApp() {
                 this.varianteParaExtras = variante;
                 this.productoParaExtras = producto;
                 this.extrasSeleccionados = [];
-                this.$wire.selectedExtras = [];
                 this.modalExtras = true;
             } else {
                 const cartLineKey = variante.id.toString();
@@ -871,10 +1026,6 @@ function posApp() {
         },
 
         confirmarExtrasYAgregar() {
-            // Mapear los IDs en $wire.selectedExtras a objetos completos
-            const seleccionados = (this.productoParaExtras?.extras || []).filter(e => this.$wire.selectedExtras.includes(e.id));
-            this.extrasSeleccionados = seleccionados;
-
             const basePrecio = parseFloat(this.varianteParaExtras.precio);
             const extrasPrecioTotal = this.extrasSeleccionados.reduce((s, e) => s + parseFloat(e.precio), 0);
             const precioFinal = basePrecio + extrasPrecioTotal;
@@ -909,6 +1060,16 @@ function posApp() {
         // ── Cobro ─────────────────────────────────────────────────────────────
         async cobrar() {
             if (this.cargandoCobro) return;
+            
+            // Validación de Cobro Mixto
+            if (this.metodoPago === 'mixto') {
+                const totalCubierto = Number(this.montoEfectivo || 0) + Number(this.montoDigital || 0);
+                if (totalCubierto < this.total) {
+                    this.errorCobro = 'El monto pagado no cubre el total de la venta.';
+                    return;
+                }
+            }
+
             this.errorCobro   = '';
             this.cargandoCobro = true;
 
@@ -926,6 +1087,11 @@ function posApp() {
                         metodo_pago:     this.metodoPago,
                         monto_entregado: this.metodoPago === 'efectivo' ? this.montoEntregado : null,
                         cliente_id:      this.clienteId || null,
+                        referencia_pago: (this.metodoPago === 'tarjeta' || this.metodoPago === 'transferencia') ? this.referenciaPago : null,
+                        monto_efectivo:  this.metodoPago === 'mixto' ? this.montoEfectivo : null,
+                        monto_digital:   this.metodoPago === 'mixto' ? this.montoDigital : null,
+                        metodo_digital:  this.metodoPago === 'mixto' ? this.metodoDigital : null,
+                        referencia_digital: this.metodoPago === 'mixto' ? this.referenciaDigital : null,
                     })
                 });
                 const data = await res.json();
@@ -934,27 +1100,36 @@ function posApp() {
                     this.openCobro  = false;
                     this.cambioFinal = data.cambio ?? 0;
                     this.ventaExitosa = true;
+
+                    // Clonar el carrito para actualizar stock y limpiar variables de estado inmediatamente
+                    const cartCopy = [...this.carrito];
+                    this.carrito = [];
+                    this.descuento = 0;
+                    this.montoEntregado = 0;
+                    this.referenciaPago = '';
+                    this.montoEfectivo = 0;
+                    this.montoDigital = 0;
+                    this.metodoDigital = 'tarjeta';
+                    this.referenciaDigital = '';
+                    this.clienteId = '';
+                    this.busqueda = '';
+                    this.extrasSeleccionados = [];
+
                     if (data.ticket_url) {
                         window.open(data.ticket_url, '_blank');
                     }
 
-                    // Despachar evento global de venta completada para actualizar dinero esperado en tiempo real
-                    window.dispatchEvent(new CustomEvent('venta-completada', {
-                        detail: {
-                            total: data.venta.total,
-                            metodo_pago: data.venta.metodo_pago
-                        }
-                    }));
-                    window.dispatchEvent(new CustomEvent('transaccion-registrada'));
-
                     // Actualizar stock local en el catálogo
-                    this.carrito.forEach(item => {
+                    cartCopy.forEach(item => {
                         for (const prod of this.todos) {
                             const v = prod.variantes.find(v => v.id === item.varianteId);
                             if (v) { v.stock_disponible = Math.max(0, v.stock_disponible - item.qty); break; }
                         }
                     });
                     this.filtrar();
+
+                    // Notificar transaccion procesada para recargar totales en tiempo real
+                    window.dispatchEvent(new CustomEvent('transaccion-procesada'));
                 } else {
                     this.errorCobro = data.message || 'Error al procesar la venta.';
                 }
@@ -972,6 +1147,11 @@ function posApp() {
             this.montoEntregado = 0;
             this.cambioFinal   = 0;
             this.clienteId     = '';
+            this.referenciaPago = '';
+            this.montoEfectivo = 0;
+            this.montoDigital = 0;
+            this.referenciaDigital = '';
+            this.extrasSeleccionados = [];
         },
 
         // ── Cobro de Pedidos (Integración) ────────────────────────────────────
@@ -1002,6 +1182,18 @@ function posApp() {
 
         async pagarPedidoAction() {
             if (!this.pedidoEncontrado || this.cargandoPagoPedido) return;
+
+            // Validación de Cobro Mixto
+            if (this.metodoPago === 'mixto') {
+                const totalCubierto = Number(this.montoEfectivo || 0) + Number(this.montoDigital || 0);
+                if (totalCubierto < this.pedidoEncontrado.saldo_pendiente) {
+                    window.dispatchEvent(new CustomEvent('show-toast', { 
+                        detail: { message: 'El monto pagado no cubre el saldo pendiente del pedido.', type: 'error' } 
+                    }));
+                    return;
+                }
+            }
+
             this.cargandoPagoPedido = true;
 
             try {
@@ -1014,8 +1206,13 @@ function posApp() {
                     body: JSON.stringify({
                         caja_sesion_id: this.sesionId,
                         pedido_id: this.pedidoEncontrado.id,
+                        metodo_pago: this.metodoPago,
                         monto_entregado: this.metodoPago === 'efectivo' ? this.montoEntregado : null,
-                        metodo_pago: this.metodoPago
+                        referencia_pago: (this.metodoPago === 'tarjeta' || this.metodoPago === 'transferencia') ? this.referenciaPago : null,
+                        monto_efectivo:  this.metodoPago === 'mixto' ? this.montoEfectivo : null,
+                        monto_digital:   this.metodoPago === 'mixto' ? this.montoDigital : null,
+                        metodo_digital:  this.metodoPago === 'mixto' ? this.metodoDigital : null,
+                        referencia_digital: this.metodoPago === 'mixto' ? this.referenciaDigital : null,
                     })
                 });
                 
@@ -1024,38 +1221,36 @@ function posApp() {
                     if (data.ticket_url) {
                         window.open(data.ticket_url, '_blank');
                     }
-                    this.modalCobroPedido = false;
-                    this.ventaExitosa = true; // Mostrar confetti o recargar
                     
-                    Swal.fire({
-                        title: 'Pago Registrado',
-                        text: 'Pago de pedido registrado con éxito. Cambio: L.' + (data.cambio || 0).toFixed(2),
-                        icon: 'success',
-                        confirmButtonColor: '#000000',
-                        background: '#ffffff',
-                        customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
-                    }).then(() => {
+                    window.dispatchEvent(new CustomEvent('show-toast', { 
+                        detail: { message: 'Pago de pedido registrado con éxito.', type: 'success' } 
+                    }));
+
+                    // Reset variables
+                    this.modalCobroPedido = false;
+                    this.pedidoEncontrado = null;
+                    this.busquedaPedidoTerm = '';
+                    this.montoEntregado = 0;
+                    this.referenciaPago = '';
+                    this.montoEfectivo = 0;
+                    this.montoDigital = 0;
+                    this.referenciaDigital = '';
+                    
+                    // Dispatch event for other components
+                    window.dispatchEvent(new CustomEvent('transaccion-procesada'));
+
+                    setTimeout(() => {
                         window.location.reload();
-                    });
+                    }, 1000);
                 } else {
-                    Swal.fire({
-                        title: 'Error',
-                        text: data.message || 'Error al procesar el pago del pedido.',
-                        icon: 'error',
-                        confirmButtonColor: '#000000',
-                        background: '#ffffff',
-                        customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
-                    });
+                    window.dispatchEvent(new CustomEvent('show-toast', { 
+                        detail: { message: data.message || 'Error al procesar el pago del pedido.', type: 'error' } 
+                    }));
                 }
             } catch (e) {
-                Swal.fire({
-                    title: 'Error de Conexión',
-                    text: 'Error de conexión al procesar el pago.',
-                    icon: 'error',
-                    confirmButtonColor: '#000000',
-                    background: '#ffffff',
-                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
-                });
+                window.dispatchEvent(new CustomEvent('show-toast', { 
+                    detail: { message: 'Error de conexión al procesar el pago.', type: 'error' } 
+                }));
             } finally {
                 this.cargandoPagoPedido = false;
             }
@@ -1163,8 +1358,19 @@ function posApp() {
                 const data = await res.json();
                 if (data.success) {
                     this.modalCorte = false;
-                    alert(data.message);
-                    window.location.reload();
+                    
+                    window.dispatchEvent(new CustomEvent('show-toast', { 
+                        detail: { message: data.message || 'Caja cerrada correctamente.', type: 'success' } 
+                    }));
+
+                    // Abrir reporte PDF en una pestaña nueva
+                    if (data.corte_id) {
+                        window.open(`/reportes/cortes-caja/${data.corte_id}/pdf`, '_blank');
+                    }
+
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 } else {
                     this.errorCorte = data.message || 'Error al procesar el corte.';
                 }

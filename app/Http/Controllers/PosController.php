@@ -85,32 +85,18 @@ class PosController extends Controller
 
         $clientes = \App\Models\Cliente::orderBy('nombre')->get();
 
-        // Calcular dinero esperado en caja física (efectivo estrictamente)
+        // Sugerir monto inicial (último fondo cerrado)
+        $ultimaSesion = CajaSesion::where('estado', 'cerrada')->latest('fecha_cierre')->first();
+        $fondoSugerido = $ultimaSesion ? (float) $ultimaSesion->monto_contado_fisico : 0.00;
+
+        // Calcular dinero esperado en caja
         $dineroEsperado = 0;
-        $digitalHoy = 0;
         if ($sesion) {
-            $ingresosEfectivo = \App\Models\CajaMovimiento::where('caja_sesion_id', $sesion->id)
-                ->where('tipo', 'ingreso')
-                ->where('referencia', 'EFECTIVO')
-                ->sum('monto');
-
-            $egresosEfectivo = \App\Models\CajaMovimiento::where('caja_sesion_id', $sesion->id)
-                ->where('tipo', 'egreso')
-                ->where('referencia', 'EFECTIVO')
-                ->sum('monto');
-
-            $dineroEsperado = $sesion->monto_inicial + $ingresosEfectivo - $egresosEfectivo;
-
-            // Total cobrado por medios digitales hoy en la sesión
-            $digitalHoy = \App\Models\CajaMovimiento::where(function($q) use ($sesion) {
-                    $q->whereDate('created_at', $sesion->fecha_apertura->toDateString());
-                })
-                ->where('tipo', 'ingreso')
-                ->whereIn('referencia', ['TRANSFERENCIA', 'TARJETA'])
-                ->sum('monto');
+            $totales = $this->obtenerTotalesSesion($sesion->id);
+            $dineroEsperado = $totales['total_esperado'];
         }
 
-        return view('pos.index', compact('sesion', 'productos', 'pedidosPendientes', 'clientes', 'dineroEsperado', 'digitalHoy'));
+        return view('pos.index', compact('sesion', 'productos', 'pedidosPendientes', 'clientes', 'dineroEsperado', 'fondoSugerido'));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -203,6 +189,12 @@ class PosController extends Controller
             'monto_entregado'     => 'nullable|numeric|min:0',
             'cliente_id'          => 'nullable|exists:clientes,id',
             'notas'               => 'nullable|string|max:500',
+            // Campos adicionales para tarjeta / transferencia / mixto
+            'referencia_pago'     => 'nullable|string|max:255',
+            'monto_efectivo'      => 'nullable|numeric|min:0',
+            'monto_digital'       => 'nullable|numeric|min:0',
+            'metodo_digital'      => 'nullable|in:tarjeta,transferencia',
+            'referencia_digital'  => 'nullable|string|max:255',
         ]);
 
         try {
@@ -259,11 +251,28 @@ class PosController extends Controller
             $total     = max(0, $subtotal - $descuento);
             $cambio    = null;
 
-            if ($request->metodo_pago === 'efectivo' && $request->monto_entregado) {
-                $cambio = $request->monto_entregado - $total;
+            // Almacenar detalles específicos del pago en las notas de la venta
+            $notasVenta = $request->notas ?? '';
+            $montoEntregadoVenta = null;
+
+            if ($request->metodo_pago === 'efectivo') {
+                $montoEntregadoVenta = $request->monto_entregado;
+                if ($montoEntregadoVenta) {
+                    $cambio = $montoEntregadoVenta - $total;
+                }
+            } elseif ($request->metodo_pago === 'tarjeta' || $request->metodo_pago === 'transferencia') {
+                $montoEntregadoVenta = $total;
+                $cambio = 0;
+                if ($request->referencia_pago) {
+                    $notasVenta = trim($notasVenta . " | Ref. Pago: " . $request->referencia_pago);
+                }
+            } elseif ($request->metodo_pago === 'mixto') {
+                $montoEntregadoVenta = $request->monto_efectivo;
+                $cambio = max(0, ($request->monto_efectivo + $request->monto_digital) - $total);
+                $notasVenta = trim($notasVenta . " | Pago Mixto — Efectivo: L. " . number_format($request->monto_efectivo, 2) . ", " . ucfirst($request->metodo_digital) . ": L. " . number_format($request->monto_digital, 2) . " (Ref: " . $request->referencia_digital . ")");
             }
 
-            // ── 2. Crear ticket ───────────────────────────────────────────────
+            // ── 2. Crear venta POS ────────────────────────────────────────────
             $clienteId = $request->cliente_id;
             if ($request->filled('pedido_id')) {
                 $p = \App\Models\Pedido::find($request->pedido_id);
@@ -279,18 +288,25 @@ class PosController extends Controller
                 'descuento'       => $descuento,
                 'total'           => $total,
                 'metodo_pago'     => $request->metodo_pago,
-                'monto_entregado' => $request->monto_entregado,
+                'monto_entregado' => $montoEntregadoVenta,
                 'cambio'          => $cambio,
                 'estado'          => 'completada',
-                'notas'           => $request->notas,
+                'notas'           => $notasVenta,
             ]);
 
             // ── 3. Crear detalles y descontar stock ───────────────────────────
             foreach ($itemsValidos as $item) {
+                // Generar nombre de la variante concatenando los extras para visualización en ticket y reportes
+                $nombreSnapshot = $item['variante']->nombre_completo;
+                if (!empty($item['extras'])) {
+                    $nombresExtras = array_column($item['extras'], 'nombre');
+                    $nombreSnapshot .= ' (' . implode(', ', $nombresExtras) . ')';
+                }
+
                 VentaPosDetalle::create([
                     'venta_pos_id'   => $venta->id,
                     'variante_id'    => $item['variante']->id,
-                    'nombre_snapshot'=> $item['variante']->nombre_completo,
+                    'nombre_snapshot'=> $nombreSnapshot,
                     'sku_snapshot'   => $item['variante']->sku,
                     'cantidad'       => $item['cantidad'],
                     'precio_unitario'=> $item['precio'],
@@ -303,57 +319,40 @@ class PosController extends Controller
                 $item['variante']->venderDirecto($item['cantidad']);
             }
 
-            // ── 4. Segregación Contable de Fondos (Efectivo vs Digital) ───────
-            $montoEfectivo = 0;
-            $montoDigital = 0;
-
-            if ($request->metodo_pago === 'efectivo') {
-                $montoEfectivo = $total;
-            } elseif (in_array($request->metodo_pago, ['transferencia', 'tarjeta'])) {
-                $montoDigital = $total;
-            } elseif ($request->metodo_pago === 'mixto') {
-                $montoEfectivo = min($total, floatval($request->monto_entregado ?? 0));
-                $montoDigital = max(0.00, $total - $montoEfectivo);
-            }
-
-            if ($montoEfectivo > 0) {
+            // ── 4. Registrar en CajaMovimiento (con aislamiento de caja_sesion_id) ──
+            if ($request->metodo_pago !== 'mixto') {
                 CajaMovimiento::create([
                     'caja_sesion_id' => $sesion->id,
                     'tipo'           => 'ingreso',
-                    'monto'          => $montoEfectivo,
-                    'concepto'       => 'Venta POS #' . $venta->id . ' (Efectivo)',
-                    'referencia'     => 'EFECTIVO',
-                    'pedido_id'      => null,
-                    'fecha'          => now()->toDateString(),
-                ]);
-            }
-
-            if ($montoDigital > 0) {
-                CajaMovimiento::create([
-                    'caja_sesion_id' => null, // Excluido del arqueo de caja física
-                    'tipo'           => 'ingreso',
-                    'monto'          => $montoDigital,
-                    'concepto'       => 'Venta POS #' . $venta->id . ' (' . ucfirst($request->metodo_pago) . ')',
+                    'monto'          => $total,
+                    'concepto'       => 'Venta POS #' . $venta->id . ($request->referencia_pago ? ' (Ref: ' . $request->referencia_pago . ')' : ''),
                     'referencia'     => strtoupper($request->metodo_pago),
                     'pedido_id'      => null,
                     'fecha'          => now()->toDateString(),
                 ]);
-
-                // Registrar en el módulo de Tesorería (Cuenta de Bancos)
-                $cuentaBancos = CuentaFinanciera::where('nombre', 'Bancos')->first();
-                if (!$cuentaBancos) {
-                    $cuentaBancos = CuentaFinanciera::where('tipo', 'banco')->first();
-                }
-                if ($cuentaBancos) {
-                    MovimientoTesoreria::create([
-                        'cuenta_id' => $cuentaBancos->id,
-                        'tipo' => 'ingreso',
-                        'monto' => $montoDigital,
-                        'concepto' => 'Venta POS #' . $venta->id . ' (' . ucfirst($request->metodo_pago) . ')',
-                        'referencia_modulo' => 'POS-Venta-Digital',
-                        'usuario_id' => Auth::id() ?? 1,
+            } else {
+                // Registro por partes para cobro mixto
+                if ($request->monto_efectivo > 0) {
+                    CajaMovimiento::create([
+                        'caja_sesion_id' => $sesion->id,
+                        'tipo'           => 'ingreso',
+                        'monto'          => $request->monto_efectivo,
+                        'concepto'       => 'Venta POS #' . $venta->id . ' (Parte Efectivo)',
+                        'referencia'     => 'EFECTIVO',
+                        'pedido_id'      => null,
+                        'fecha'          => now()->toDateString(),
                     ]);
-                    $cuentaBancos->increment('saldo_actual', $montoDigital);
+                }
+                if ($request->monto_digital > 0) {
+                    CajaMovimiento::create([
+                        'caja_sesion_id' => $sesion->id,
+                        'tipo'           => 'ingreso',
+                        'monto'          => $request->monto_digital,
+                        'concepto'       => 'Venta POS #' . $venta->id . ' (Parte ' . ucfirst($request->metodo_digital) . ' Ref: ' . $request->referencia_digital . ')',
+                        'referencia'     => strtoupper($request->metodo_digital),
+                        'pedido_id'      => null,
+                        'fecha'          => now()->toDateString(),
+                    ]);
                 }
             }
 
@@ -409,6 +408,11 @@ class PosController extends Controller
             'pedido_id'       => 'required|exists:pedidos,id',
             'monto_entregado' => 'nullable|numeric|min:0',
             'metodo_pago'     => 'required|in:efectivo,transferencia,tarjeta,mixto',
+            'referencia_pago'    => 'nullable|string|max:255',
+            'monto_efectivo'     => 'nullable|numeric|min:0',
+            'monto_digital'      => 'nullable|numeric|min:0',
+            'metodo_digital'     => 'nullable|in:tarjeta,transferencia',
+            'referencia_digital' => 'nullable|string|max:255',
         ]);
 
         try {
@@ -436,6 +440,18 @@ class PosController extends Controller
                     $cambio = 0;
                     $monto_pagado = $request->monto_entregado;
                 }
+            } elseif ($request->metodo_pago === 'tarjeta' || $request->metodo_pago === 'transferencia') {
+                $monto_pagado = $monto_a_cobrar;
+                $cambio = 0;
+            } elseif ($request->metodo_pago === 'mixto') {
+                $total_mixto = $request->monto_efectivo + $request->monto_digital;
+                if ($total_mixto >= $monto_a_cobrar) {
+                    $cambio = $total_mixto - $monto_a_cobrar;
+                    $monto_pagado = $monto_a_cobrar;
+                } else {
+                    $cambio = 0;
+                    $monto_pagado = $total_mixto;
+                }
             } else {
                 $monto_pagado = $monto_a_cobrar;
             }
@@ -460,63 +476,56 @@ class PosController extends Controller
             
             $pedido->save();
 
-            // ── Registrar ingreso con segregación contable de fondos ─────────
-            $montoEfectivo = 0;
-            $montoDigital = 0;
+            // Registrar ingresos en CajaMovimiento (con aislamiento y desglose de cobro mixto)
+            $primerMovimientoId = null;
+            $conceptoBase = ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden;
 
-            if ($request->metodo_pago === 'efectivo') {
-                $montoEfectivo = $monto_pagado;
-            } elseif (in_array($request->metodo_pago, ['transferencia', 'tarjeta'])) {
-                $montoDigital = $monto_pagado;
-            } elseif ($request->metodo_pago === 'mixto') {
-                $montoEfectivo = min($monto_pagado, floatval($request->monto_entregado ?? 0));
-                $montoDigital = max(0.00, $monto_pagado - $montoEfectivo);
-            }
-
-            $movimiento = null;
-
-            if ($montoEfectivo > 0) {
+            if ($request->metodo_pago !== 'mixto') {
                 $movimiento = CajaMovimiento::create([
                     'caja_sesion_id' => $sesion->id,
                     'tipo'           => 'ingreso',
-                    'monto'          => $montoEfectivo,
-                    'concepto'       => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden . ' (Efectivo)',
-                    'referencia'     => 'EFECTIVO',
-                    'pedido_id'      => $pedido->id,
-                    'fecha'          => now()->toDateString(),
-                ]);
-            }
-
-            if ($montoDigital > 0) {
-                $movDigital = CajaMovimiento::create([
-                    'caja_sesion_id' => null, // Excluido del arqueo de caja física
-                    'tipo'           => 'ingreso',
-                    'monto'          => $montoDigital,
-                    'concepto'       => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden . ' (' . ucfirst($request->metodo_pago) . ')',
+                    'monto'          => $monto_pagado,
+                    'concepto'       => $conceptoBase . ($request->referencia_pago ? ' (Ref: ' . $request->referencia_pago . ')' : ''),
                     'referencia'     => strtoupper($request->metodo_pago),
                     'pedido_id'      => $pedido->id,
                     'fecha'          => now()->toDateString(),
                 ]);
+                $primerMovimientoId = $movimiento->id;
+            } else {
+                // Distribución matemática exacta del pago mixto
+                $efectivoAbonado = $request->monto_efectivo;
+                $digitalAbonado = $request->monto_digital;
 
-                if (!$movimiento) {
-                    $movimiento = $movDigital;
+                if ($cambio > 0) {
+                    $efectivoAbonado = max(0, $efectivoAbonado - $cambio);
                 }
 
-                // Registrar en bancos de Tesorería
-                $cuentaBancos = CuentaFinanciera::where('nombre', 'Bancos')->first();
-                if (!$cuentaBancos) {
-                    $cuentaBancos = CuentaFinanciera::where('tipo', 'banco')->first();
-                }
-                if ($cuentaBancos) {
-                    MovimientoTesoreria::create([
-                        'cuenta_id' => $cuentaBancos->id,
-                        'tipo' => 'ingreso',
-                        'monto' => $montoDigital,
-                        'concepto' => ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden . ' (' . ucfirst($request->metodo_pago) . ')',
-                        'referencia_modulo' => 'Pedido-Cobro-Digital',
-                        'usuario_id' => Auth::id() ?? 1,
+                if ($efectivoAbonado > 0) {
+                    $movimientoEfectivo = CajaMovimiento::create([
+                        'caja_sesion_id' => $sesion->id,
+                        'tipo'           => 'ingreso',
+                        'monto'          => $efectivoAbonado,
+                        'concepto'       => $conceptoBase . ' (Parte Efectivo)',
+                        'referencia'     => 'EFECTIVO',
+                        'pedido_id'      => $pedido->id,
+                        'fecha'          => now()->toDateString(),
                     ]);
-                    $cuentaBancos->increment('saldo_actual', $montoDigital);
+                    $primerMovimientoId = $movimientoEfectivo->id;
+                }
+
+                if ($digitalAbonado > 0) {
+                    $movimientoDigital = CajaMovimiento::create([
+                        'caja_sesion_id' => $sesion->id,
+                        'tipo'           => 'ingreso',
+                        'monto'          => $digitalAbonado,
+                        'concepto'       => $conceptoBase . ' (Parte ' . ucfirst($request->metodo_digital) . ' Ref: ' . $request->referencia_digital . ')',
+                        'referencia'     => strtoupper($request->metodo_digital),
+                        'pedido_id'      => $pedido->id,
+                        'fecha'          => now()->toDateString(),
+                    ]);
+                    if (!$primerMovimientoId) {
+                        $primerMovimientoId = $movimientoDigital->id;
+                    }
                 }
             }
 
@@ -526,7 +535,7 @@ class PosController extends Controller
                 'success' => true,
                 'pedido'  => $pedido,
                 'cambio'  => $cambio,
-                'ticket_url' => route('pago.ticket', $movimiento->id),
+                'ticket_url' => route('pago.ticket', $primerMovimientoId),
                 'message' => 'Pedido cobrado y marcado como Entregado.'
             ]);
 
@@ -548,7 +557,6 @@ class PosController extends Controller
         
         if ($pedido) {
             $saldoActual = $pedido->saldo_pendiente;
-            // El saldo anterior era el saldo actual mas el monto de esta transaccion
             $saldoAnterior = $saldoActual + $pago->monto;
             if ($saldoActual <= 0) {
                 $tipo = 'Liquidación';
@@ -579,18 +587,16 @@ class PosController extends Controller
             return redirect()->route('pos.index')->with('error', 'No hay una sesión de caja abierta.');
         }
 
-        $ventas          = $sesion->ventas()->where('estado', 'completada')->get();
-        $totalVentas     = $ventas->sum('total');
-        $ventasPorMetodo = $sesion->ventasPorMetodo();
+        $totales = $this->obtenerTotalesSesion($sesion->id);
 
-        $retiros = CajaMovimiento::where('tipo', 'egreso')
-            ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
-            ->sum('monto');
-
-        $totalEsperado = $sesion->monto_inicial + $totalVentas - $retiros;
+        $fondoInicial = $totales['fondo_inicial'];
+        $ventasEfectivo = $totales['ventas_efectivo'];
+        $ingresosBancos = $totales['ingresos_bancos'];
+        $retiros = $totales['egresos'];
+        $totalEsperado = $totales['total_esperado'];
 
         return view('pos.corte', compact(
-            'sesion', 'ventas', 'totalVentas', 'ventasPorMetodo', 'retiros', 'totalEsperado'
+            'sesion', 'fondoInicial', 'ventasEfectivo', 'ingresosBancos', 'retiros', 'totalEsperado'
         ));
     }
 
@@ -615,12 +621,8 @@ class PosController extends Controller
                 throw new \Exception('Esta sesión ya fue cerrada anteriormente.');
             }
 
-            $totalVentas = $sesion->totalVentas();
-            $retiros     = CajaMovimiento::where('tipo', 'egreso')
-                ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
-                ->sum('monto');
-
-            $montoFinalEsperado = $sesion->monto_inicial + $totalVentas - $retiros;
+            $totales = $this->obtenerTotalesSesion($sesion->id);
+            $montoFinalEsperado = $totales['total_esperado'];
             $diferencia         = $request->monto_contado_fisico - $montoFinalEsperado;
 
             $sesion->update([
@@ -663,21 +665,13 @@ class PosController extends Controller
                 throw new \Exception('Esta sesión ya fue cerrada.');
             }
 
-            // 1. Obtener totales de la sesión
-            $ventasEfectivo = $sesion->ventas()
-                ->where('estado', 'completada')
-                ->where('metodo_pago', 'efectivo')
-                ->sum('total');
-
-            $retiros = CajaMovimiento::where('tipo', 'egreso')
-                ->whereDate('fecha', $sesion->fecha_apertura->toDateString())
-                ->sum('monto');
-
-            // Dinero esperado = inicial + ventas efectivo - retiros
-            $montoFinalEsperado = $sesion->monto_inicial + $ventasEfectivo - $retiros;
+            // 1. Obtener totales de la sesión con aislamiento estricto
+            $totales = $this->obtenerTotalesSesion($sesion->id);
+            $ventasEfectivo = $totales['ventas_efectivo'];
+            $montoFinalEsperado = $totales['total_esperado'];
             $diferencia = $request->monto_contado_fisico - $montoFinalEsperado;
 
-            // El monto retirado a tesorería se descuenta de la caja. Lo restante queda como fondo inicial siguiente.
+            // El remanente
             $montoRestante = max(0, $request->monto_contado_fisico - $request->monto_a_retirar);
 
             // Actualizar la sesión
@@ -685,7 +679,7 @@ class PosController extends Controller
                 'estado'               => 'cerrada',
                 'fecha_cierre'         => now(),
                 'monto_final_esperado' => $montoFinalEsperado,
-                'monto_contado_fisico' => $montoRestante, // El fondo que se queda en caja para la siguiente sesión
+                'monto_contado_fisico' => $montoRestante,
                 'diferencia'           => $diferencia,
                 'notas'                => trim(($request->notas ?? '') . " | Corte. Arqueo físico: L. " . number_format($request->monto_contado_fisico, 2) . " | Retiro Tesorería: L. " . number_format($request->monto_a_retirar, 2) . " | Remanente: L. " . number_format($montoRestante, 2)),
             ]);
@@ -699,7 +693,7 @@ class PosController extends Controller
             if ($cuentaTesoreria && $request->monto_a_retirar > 0) {
                 MovimientoTesoreria::create([
                     'cuenta_id' => $cuentaTesoreria->id,
-                    'tipo' => 'ingreso', // Guardado como ingreso en DB
+                    'tipo' => 'ingreso',
                     'monto' => $request->monto_a_retirar,
                     'concepto' => "Corte de caja de " . ($sesion->usuario->name ?? 'Cajero') . " - " . now()->format('d/m/Y'),
                     'referencia_modulo' => 'POS-Corte-Caja',
@@ -709,9 +703,10 @@ class PosController extends Controller
                 $cuentaTesoreria->increment('saldo_actual', $request->monto_a_retirar);
             }
 
-            // 3. Registrar el egreso de la caja del POS
+            // 3. Registrar el egreso de la caja del POS (aislado por caja_sesion_id)
             if ($request->monto_a_retirar > 0) {
                 CajaMovimiento::create([
+                    'caja_sesion_id' => $sesion->id,
                     'tipo' => 'egreso',
                     'monto' => $request->monto_a_retirar,
                     'concepto' => 'Retiro por Corte de Caja hacia Tesorería',
@@ -721,7 +716,7 @@ class PosController extends Controller
             }
 
             // 4. Registrar la auditoría del corte de caja
-            CorteCaja::create([
+            $corte = CorteCaja::create([
                 'usuario_id'       => $sesion->usuario_id ?? Auth::id() ?? 1,
                 'fecha_apertura'   => $sesion->fecha_apertura,
                 'fecha_cierre'     => now(),
@@ -738,6 +733,7 @@ class PosController extends Controller
 
             return response()->json([
                 'success' => true,
+                'corte_id' => $corte->id,
                 'monto_restante' => $montoRestante,
                 'message' => 'Cierre / Corte de caja procesado con éxito.',
                 'redirect' => route('pos.index'),
@@ -747,5 +743,58 @@ class PosController extends Controller
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+    }
+
+    /**
+     * Helper para obtener los totales de la sesión con aislamiento estricto
+     */
+    public function obtenerTotalesSesion($sesionId)
+    {
+        $sesion = CajaSesion::findOrFail($sesionId);
+
+        // Ingresos en efectivo (ventas directas + abonos de pedidos)
+        $ventasEfectivo = CajaMovimiento::where('caja_sesion_id', $sesion->id)
+            ->where('tipo', 'ingreso')
+            ->where('referencia', 'EFECTIVO')
+            ->sum('monto');
+
+        // Ingresos a bancos (ventas directas + abonos de pedidos por tarjeta/transferencia)
+        $ingresosBancos = CajaMovimiento::where('caja_sesion_id', $sesion->id)
+            ->where('tipo', 'ingreso')
+            ->whereIn('referencia', ['TARJETA', 'TRANSFERENCIA'])
+            ->sum('monto');
+
+        // Egresos de efectivo (retiros de caja)
+        $egresos = CajaMovimiento::where('caja_sesion_id', $sesion->id)
+            ->where('tipo', 'egreso')
+            ->where('referencia', 'Efectivo')
+            ->sum('monto');
+
+        $totalEsperado = $sesion->monto_inicial + $ventasEfectivo - $egresos;
+
+        return [
+            'fondo_inicial'   => (float) $sesion->monto_inicial,
+            'ventas_efectivo' => (float) $ventasEfectivo,
+            'ingresos_bancos' => (float) $ingresosBancos,
+            'egresos'         => (float) $egresos,
+            'total_esperado'  => (float) $totalEsperado,
+        ];
+    }
+
+    /**
+     * Endpoint JSON para retornar los totales de la sesión actual (tiempo real)
+     */
+    public function obtenerTotalesSesionJson(Request $request)
+    {
+        $request->validate([
+            'caja_sesion_id' => 'required|exists:caja_sesiones,id',
+        ]);
+
+        $totales = $this->obtenerTotalesSesion($request->caja_sesion_id);
+
+        return response()->json([
+            'success' => true,
+            'totales' => $totales
+        ]);
     }
 }

@@ -24,34 +24,10 @@
             @endif
         </div>
 
-        @php
-            $totalPedido = (float) $pedido->total_pedido;
-            $totalAbonado = (float) $pedido->movimientosCaja()->where('tipo', 'ingreso')->sum('monto');
-            $saldoPendiente = max(0.00, $totalPedido - $totalAbonado);
-        @endphp
-
         <!-- Título -->
         <div class="text-center mb-6">
             <h2 class="text-sm font-medium text-neutral-500 uppercase tracking-wider">Orden</h2>
             <div class="text-3xl font-extrabold text-neutral-900">#{{ $pedido->numero_orden }}</div>
-            <div class="text-xs text-neutral-400 mt-1">Registrado: {{ \Carbon\Carbon::parse($pedido->created_at)->timezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}</div>
-            
-            <!-- Badge de Estado de Pago -->
-            <div class="mt-3">
-                @if($saldoPendiente <= 0)
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Liquidado
-                    </span>
-                @elseif($totalAbonado > 0 && $saldoPendiente > 0)
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                        Abono / Pago Parcial
-                    </span>
-                @else
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
-                        Pago Pendiente
-                    </span>
-                @endif
-            </div>
         </div>
 
         <!-- Timeline / Estado -->
@@ -121,7 +97,7 @@
                         <div class="flex flex-col">
                             <span class="text-sm font-bold text-neutral-800">{{ $historial->estado_nuevo }}</span>
                             <span class="text-xs text-neutral-400 mt-0.5">
-                                {{ $historial->hora_honduras }}
+                                {{ $historial->created_at->timezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}
                             </span>
                         </div>
                     </div>
@@ -136,17 +112,15 @@
             <ul class="divide-y divide-neutral-100">
                 @foreach($pedido->detalles as $detalle)
                 <li class="py-3 flex justify-between items-start">
-                    <div class="flex flex-col flex-1 min-w-0 pr-4">
-                        <span class="font-medium text-neutral-900 truncate">
-                            {{ $detalle->tipo_producto === 'Libre' ? $detalle->nombre_libre : ($detalle->variante->producto->nombre ?? 'Producto') }}
-                        </span>
-                        @if($detalle->tipo_producto !== 'Libre' && $detalle->variante && $detalle->variante->nombre != 'Única')
+                    <div class="flex flex-col">
+                        <span class="font-medium text-neutral-900">{{ $detalle->variante->producto->nombre }}</span>
+                        @if($detalle->variante->nombre != 'Única')
                         <span class="text-xs text-neutral-500">{{ $detalle->variante->nombre }}</span>
                         @endif
                     </div>
-                    <div class="flex items-center space-x-3 text-right flex-shrink-0">
-                        <span class="text-xs text-neutral-500">L.{{ number_format($detalle->precio_venta, 2) }} x{{ $detalle->cantidad }}</span>
-                        <span class="font-semibold text-neutral-900">L.{{ number_format($detalle->subtotal, 2) }}</span>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-neutral-500">x{{ $detalle->cantidad }}</span>
+                        <span class="font-semibold text-neutral-900">L.{{ number_format($detalle->importe, 2) }}</span>
                     </div>
                 </li>
                 @endforeach
@@ -171,21 +145,22 @@
                 @endif
                 
                 <div class="flex justify-between text-lg font-bold text-neutral-900 pt-2 border-t border-neutral-100">
-                    <span>Total del Pedido</span>
-                    <span>L.{{ number_format($totalPedido, 2) }}</span>
+                    <span>Total</span>
+                    <span>L.{{ number_format($pedido->total, 2) }}</span>
                 </div>
                 
                 <div class="flex justify-between text-emerald-600 pt-2">
-                    <span>Total Abonado</span>
-                    <span>L.{{ number_format($totalAbonado, 2) }}</span>
+                    <span>Abonado</span>
+                    <span>L.{{ number_format($pedido->abonado, 2) }}</span>
                 </div>
                 
                 <div class="flex justify-between text-xl font-black text-neutral-900 pt-3 border-t border-neutral-100">
                     <span>Saldo Pendiente</span>
-                    <span>L.{{ number_format($saldoPendiente, 2) }}</span>
+                    <span>L.{{ number_format($pedido->total - $pedido->abonado, 2) }}</span>
                 </div>
             </div>
         </div>
+
     </div>
 
 </body>

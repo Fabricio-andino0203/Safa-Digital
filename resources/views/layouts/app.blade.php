@@ -54,7 +54,6 @@
                     ['route' => 'dashboard',        'label' => 'Inicio',     'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
                     ['route' => 'pedidos.index',    'label' => 'Pedidos',    'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
                     ['route' => 'pos.index',        'label' => 'Caja / POS', 'icon' => 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z'],
-                    ['route' => 'caja.historial',   'label' => 'Historial de Caja', 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
                     ['route' => 'clientes.index',   'label' => 'Clientes',   'icon' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'],
                     ['route' => 'cotizaciones.index','label' => 'Cotizaciones','icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
                     ['route' => 'inventario.index', 'label' => 'Inventario', 'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
@@ -222,58 +221,5 @@
 
     @stack('modals')
     @stack('scripts')
-
-    <!-- SweetAlert2 CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.on('swal-success', (event) => {
-                let data = event[0] || event;
-                Swal.fire({
-                    title: data.title || '¡Éxito!',
-                    text: data.message,
-                    icon: 'success',
-                    confirmButtonColor: '#000000',
-                    background: '#ffffff',
-                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
-                });
-            });
-            Livewire.on('swal-error', (event) => {
-                let data = event[0] || event;
-                Swal.fire({
-                    title: data.title || 'Error',
-                    text: data.message,
-                    icon: 'error',
-                    confirmButtonColor: '#000000',
-                    background: '#ffffff',
-                    customClass: { popup: 'rounded-xl shadow-lg border border-gray-100' }
-                });
-            });
-        });
-
-        // Sobreescribir el alert nativo para una experiencia premium minimalista
-        window.alert = function(message) {
-            let icon = 'info';
-            let title = 'Información';
-            
-            const lowerMsg = message.toLowerCase();
-            if (lowerMsg.includes('éxito') || lowerMsg.includes('correcto') || lowerMsg.includes('exitosamente') || lowerMsg.includes('completado') || lowerMsg.includes('creado') || lowerMsg.includes('actualizado')) {
-                icon = 'success';
-                title = '¡Éxito!';
-            } else if (lowerMsg.includes('error') || lowerMsg.includes('fall') || lowerMsg.includes('insuficiente') || lowerMsg.includes('incorrecto') || lowerMsg.includes('ya fue') || lowerMsg.includes('ya existe')) {
-                icon = 'error';
-                title = 'Atención';
-            }
-
-            Swal.fire({
-                title: title,
-                text: message,
-                icon: icon,
-                confirmButtonColor: '#000000',
-                background: '#ffffff',
-                customClass: { popup: 'rounded-2xl border border-neutral-100 shadow-xl' }
-            });
-        };
-    </script>
 </body>
 </html>

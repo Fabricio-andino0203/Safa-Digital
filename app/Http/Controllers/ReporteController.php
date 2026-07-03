@@ -113,21 +113,39 @@ class ReporteController extends Controller
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date',
         ]);
-        $inicio = $request->fecha_inicio . ' 00:00:00';
-        $fin = $request->fecha_fin . ' 23:59:59';
+        $inicio = \Carbon\Carbon::parse($request->fecha_inicio)->startOfDay()->toDateTimeString();
+        $fin = \Carbon\Carbon::parse($request->fecha_fin)->endOfDay()->toDateTimeString();
 
-        $detalles = DB::table('pedido_detalles')
+        // 1. Obtener detalles de pedidos tradicionales entregados
+        $detallesPedidos = DB::table('pedido_detalles')
             ->join('pedidos', 'pedido_detalles.pedido_id', '=', 'pedidos.id')
             ->leftJoin('producto_variantes', 'pedido_detalles.producto_variante_id', '=', 'producto_variantes.id')
             ->select(
                 DB::raw('COALESCE(pedido_detalles.nombre_snapshot, pedido_detalles.nombre_libre) as nombre_item'),
                 'pedido_detalles.cantidad',
-                'pedido_detalles.precio_venta',
+                'pedido_detalles.precio_venta as precio_venta',
                 'producto_variantes.costo as costo_unitario'
             )
             ->whereBetween('pedidos.created_at', [$inicio, $fin])
             ->where('pedidos.estado', 'Entregado')
             ->get();
+
+        // 2. Obtener detalles de ventas directas realizadas desde el POS
+        $detallesVentasPos = DB::table('venta_pos_detalles')
+            ->join('ventas_pos', 'venta_pos_detalles.venta_pos_id', '=', 'ventas_pos.id')
+            ->leftJoin('producto_variantes', 'venta_pos_detalles.variante_id', '=', 'producto_variantes.id')
+            ->select(
+                'venta_pos_detalles.nombre_snapshot as nombre_item',
+                'venta_pos_detalles.cantidad',
+                'venta_pos_detalles.precio_unitario as precio_venta',
+                'producto_variantes.costo as costo_unitario'
+            )
+            ->whereBetween('ventas_pos.created_at', [$inicio, $fin])
+            ->where('ventas_pos.estado', 'completada')
+            ->get();
+
+        // Combinar ambas colecciones
+        $detalles = $detallesPedidos->concat($detallesVentasPos);
 
         $totalVentas = 0;
         $totalCostos = 0;
@@ -135,9 +153,9 @@ class ReporteController extends Controller
         $items = [];
 
         foreach ($detalles as $d) {
-            $cant = $d->cantidad;
+            $cant = (int) $d->cantidad;
             $precio = (float) $d->precio_venta;
-            $costo = (float) ($d->costo_unitario ?? 0.00);
+            $costo = (float) ($d->costo_unitario ?? 0.00); // Si costo es null o cero, no se excluye, se asume 0.00
 
             $subVenta = $precio * $cant;
             $subCosto = $costo * $cant;

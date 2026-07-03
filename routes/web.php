@@ -50,28 +50,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/{id}/fecha-entrega', [PedidoController::class, 'updateFechaEntrega'])->name('updateFechaEntrega');
         Route::post('/{id}/archivos',        [PedidoController::class, 'uploadFiles'])->name('uploadFiles');
         Route::post('/{id}/cancelar',        [PedidoController::class, 'cancelar'])->name('cancelar');
-        Route::get('/archivos/{id}/descargar', [PedidoController::class, 'descargarArchivo'])->name('archivos.descargar');
     });
-
-    Route::get('/pedidos/{id}/descargar', function ($id) {
-        $archivo = \App\Models\PedidoArchivo::find($id);
-        if ($archivo) {
-            $ruta = str_replace('storage/', '', $archivo->ruta);
-            if (\Storage::disk('public')->exists($ruta)) {
-                return \Storage::disk('public')->download($ruta, $archivo->nombre_original);
-            }
-        }
-        
-        $pedido = \App\Models\Pedido::find($id);
-        if ($pedido && $pedido->adjunto) {
-            $ruta = str_replace('storage/', '', $pedido->adjunto);
-            if (\Storage::disk('public')->exists($ruta)) {
-                return \Storage::disk('public')->download($ruta);
-            }
-        }
-        
-        abort(404, 'Archivo no encontrado');
-    })->name('pedidos.descargar');
 
     // ─── Configuración Global ──────────────────────────────────────────────────
     Route::prefix('configuracion')->name('configuracion.')->middleware('permiso:configuracion')->group(function () {
@@ -79,8 +58,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/empresa', [\App\Http\Controllers\ConfiguracionController::class, 'updateEmpresa'])->name('update.empresa');
         Route::post('/tickets', [\App\Http\Controllers\ConfiguracionController::class, 'updateTickets'])->name('update.tickets');
         Route::post('/whatsapp', [\App\Http\Controllers\ConfiguracionController::class, 'updateWhatsapp'])->name('update.whatsapp');
-        Route::post('/reset-pruebas', [\App\Http\Controllers\ConfiguracionController::class, 'resetPruebas'])->name('reset.pruebas');
-
+        
         // CRUD Usuarios
         Route::post('/usuarios', [\App\Http\Controllers\UsuarioController::class, 'store'])->name('usuarios.store');
         Route::patch('/usuarios/{id}', [\App\Http\Controllers\UsuarioController::class, 'update'])->name('usuarios.update');
@@ -99,8 +77,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/',  [CajaController::class, 'index'])->name('index');
         Route::post('/', [CajaController::class, 'store'])->name('store');
         Route::get('/{id}/ticket', [CajaController::class, 'descargarTicket'])->name('ticket');
-        Route::get('/historial', [\App\Http\Controllers\HistorialMovimientosController::class, 'index'])->name('historial');
-        Route::get('/historial/{id}/reimprimir', [\App\Http\Controllers\HistorialMovimientosController::class, 'reimprimir'])->name('historial.reimprimir');
     });
 
     // ─── Inventario ───────────────────────────────────────────────────────────────
@@ -142,6 +118,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/pedidos/pagar',   [PosController::class, 'pagarPedido'])->name('pagarPedido');
         
         Route::get('/corte',            [PosController::class, 'corteCaja'])->name('corteCaja');
+        Route::get('/sesion/totales',   [PosController::class, 'obtenerTotalesSesionJson'])->name('sesion.totales');
         Route::post('/sesion/cerrar',   [PosController::class, 'cerrarSesion'])->name('cerrarSesion');
         Route::post('/sesion/corte',    [PosController::class, 'cerrarCaja'])->name('cerrarCaja');
     });

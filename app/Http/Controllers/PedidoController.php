@@ -357,7 +357,7 @@ class PedidoController extends Controller
 
     public function track($numero_orden)
     {
-        $pedido = Pedido::with(['cliente', 'detalles.variante.producto', 'historiales.usuario', 'movimientosCaja'])
+        $pedido = Pedido::with(['cliente', 'detalles.variante.producto', 'historiales.usuario'])
             ->where('numero_orden', $numero_orden)
             ->first();
 
@@ -420,17 +420,5 @@ class PedidoController extends Controller
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
-    }
-
-    public function descargarArchivo($id)
-    {
-        $archivo = \App\Models\PedidoArchivo::findOrFail($id);
-        $ruta = str_replace('storage/', '', $archivo->ruta);
-
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($ruta)) {
-            return response()->download(storage_path('app/public/' . $ruta), $archivo->nombre_original);
-        }
-
-        return abort(404, 'El archivo no se encontró en el disco del servidor.');
     }
 }
