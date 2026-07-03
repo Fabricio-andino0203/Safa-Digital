@@ -816,29 +816,49 @@ class PosController extends Controller
             'concepto'       => 'required|string|max:255',
         ]);
 
+        DB::beginTransaction();
         try {
             $sesion = CajaSesion::findOrFail($request->caja_sesion_id);
             if ($sesion->estado !== 'abierta') {
                 throw new \Exception('La sesión de caja está cerrada.');
             }
 
-            // Registrar movimiento de egreso hacia bancos (tipo: egreso, referencia: Bancos)
+            // 1. Registrar movimiento de egreso de caja física (tipo: egreso, referencia: Efectivo)
             $movimiento = CajaMovimiento::create([
                 'caja_sesion_id' => $sesion->id,
                 'tipo'           => 'egreso',
                 'monto'          => $request->monto,
-                'concepto'       => 'Gasto: ' . $request->concepto,
-                'referencia'     => 'Bancos',
+                'concepto'       => 'Retiro de Efectivo: ' . $request->concepto,
+                'referencia'     => 'Efectivo',
                 'fecha'          => now()->toDateString(),
             ]);
 
+            // 2. Integración Global con Tesorería: registrar egreso en el balance de efectivo central
+            $cuentaEfectivo = \App\Models\CuentaFinanciera::where('tipo', 'efectivo')->first();
+            if ($cuentaEfectivo) {
+                \App\Models\MovimientoTesoreria::create([
+                    'cuenta_id'         => $cuentaEfectivo->id,
+                    'tipo'              => 'egreso',
+                    'monto'             => $request->monto,
+                    'concepto'          => 'Gasto Operativo POS: ' . $request->concepto,
+                    'referencia_modulo' => 'Gasto Operativo POS',
+                    'usuario_id'        => Auth::id() ?? 1,
+                ]);
+
+                // Decrementar saldo en la cuenta de efectivo de tesorería central
+                $cuentaEfectivo->decrement('saldo_actual', $request->monto);
+            }
+
+            DB::commit();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Retiro registrado correctamente en Bancos (Gasto).',
+                'message' => 'Retiro registrado correctamente (descontado de Efectivo físico).',
                 'movimiento' => $movimiento
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()

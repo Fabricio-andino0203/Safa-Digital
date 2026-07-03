@@ -172,7 +172,14 @@
                         <td class="px-6 py-4 font-bold {{ $mov->tipo === 'ingreso' ? 'text-green-600' : 'text-red-500' }}">
                             {{ $mov->tipo === 'ingreso' ? '+' : '−' }} L. {{ number_format($mov->monto, 2) }}
                         </td>
-                        <td class="px-6 py-4 max-w-xs truncate" title="{{ $mov->concepto }}">{{ $mov->concepto }}</td>
+                        <td class="px-6 py-4 max-w-xs truncate" title="{{ $mov->concepto }}">
+                            {{ $mov->concepto }}
+                            @if($mov->referencia_modulo === 'Gasto Operativo POS')
+                                <span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200">
+                                    POS (Solo Lectura)
+                                </span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-neutral-500">{{ $mov->usuario->name ?? 'Usuario' }}</td>
                     </tr>
                     @empty

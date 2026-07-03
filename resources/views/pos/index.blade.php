@@ -835,7 +835,7 @@
 
                     <div class="space-y-4">
                         <div class="bg-red-50 border border-red-100 text-red-800 rounded-xl p-3.5 text-xs font-semibold">
-                            ⚠️ Este retiro se registrará como un Gasto operativo y afectará directamente el balance de Bancos. El efectivo físico en caja no será alterado.
+                            ⚠️ Este retiro se descontará directamente del Efectivo físico en caja. Asegúrate de guardar el comprobante para el cuadre del turno.
                         </div>
 
                         <div>
