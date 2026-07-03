@@ -19,6 +19,7 @@ class VentaPosDetalle extends Model
         'sku_snapshot',     // Snapshot del SKU: "CAM-NEG-M"
         'cantidad',
         'precio_unitario',
+        'costo_unitario',
         'descuento_linea',
         'subtotal',
         'extras',
@@ -27,6 +28,7 @@ class VentaPosDetalle extends Model
     protected $casts = [
         'cantidad'        => 'integer',
         'precio_unitario' => 'decimal:2',
+        'costo_unitario'  => 'decimal:2',
         'descuento_linea' => 'decimal:2',
         'subtotal'        => 'decimal:2',
         'extras'          => 'array',

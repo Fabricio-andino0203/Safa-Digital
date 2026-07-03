@@ -7,6 +7,12 @@
             class="px-4 py-1.5 text-xs font-bold bg-neutral-900 text-white rounded-xl hover:bg-neutral-800 transition-all shadow-sm">
         Cobrar Pedido
     </button>
+
+    <!-- Botón para Retiro (Gasto a Bancos) -->
+    <button @click="$dispatch('abrir-retiro-caja')"
+            class="px-4 py-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all shadow-sm">
+        Retiro
+    </button>
     
     <div class="flex items-center gap-2 text-sm ml-2 border-l border-neutral-200 pl-4">
         <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -807,6 +813,59 @@
         </div>
     </div>
 
+    <!-- Modal: Retiro (Gasto a Bancos) -->
+    <div x-show="modalRetiro" class="relative z-50" x-cloak>
+        <div x-show="modalRetiro" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div x-show="modalRetiro"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     @click.away="modalRetiro = false"
+                     class="relative w-full max-w-md transform overflow-hidden rounded-3xl bg-white shadow-2xl p-7 border border-neutral-100 space-y-5">
+                    
+                    <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
+                        <h3 class="text-lg font-bold text-neutral-900">Registrar Retiro</h3>
+                        <button @click="modalRetiro = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="bg-red-50 border border-red-100 text-red-800 rounded-xl p-3.5 text-xs font-semibold">
+                            ⚠️ Este retiro se registrará como un Gasto operativo y afectará directamente el balance de Bancos. El efectivo físico en caja no será alterado.
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Monto del Retiro ($) *</label>
+                            <input type="number" step="0.01" x-model.number="montoRetiro" min="0.01" placeholder="0.00"
+                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm text-center font-bold text-lg"/>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Concepto / Motivo del Retiro *</label>
+                            <textarea x-model="conceptoRetiro" rows="2" placeholder="Ej. Pago de flete, compra de papelería, etc."
+                                      class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm transition-all focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"></textarea>
+                        </div>
+
+                        <div x-show="errorRetiro" class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5" x-text="errorRetiro"></div>
+
+                        <button @click="procesarRetiroCaja()" :disabled="cargandoRetiro || !montoRetiro || !conceptoRetiro.trim()"
+                                class="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-2 shadow-sm">
+                            <svg x-show="cargandoRetiro" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            <span>Confirmar Retiro</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification Banner -->
     <div x-data="{ show: false, message: '', type: 'success' }"
          x-on:show-toast.window="message = $event.detail.message; type = $event.detail.type || 'success'; show = true; setTimeout(() => show = false, 3500)"
@@ -863,6 +922,13 @@ function posApp() {
         notasCorte: '',
         cargandoCorte: false,
         errorCorte: '',
+
+        // Retiro (Gasto a Bancos)
+        modalRetiro: false,
+        montoRetiro: 0,
+        conceptoRetiro: '',
+        cargandoRetiro: false,
+        errorRetiro: '',
 
         // Catálogo (productos con variantes)
         todos:    @json($productos),
@@ -948,6 +1014,12 @@ function posApp() {
                 this.notasCorte = '';
                 this.errorCorte = '';
                 this.actualizarTotalesCaja();
+            });
+            window.addEventListener('abrir-retiro-caja', () => {
+                this.modalRetiro = true;
+                this.montoRetiro = 0;
+                this.conceptoRetiro = '';
+                this.errorRetiro = '';
             });
             window.addEventListener('transaccion-procesada', () => {
                 this.actualizarTotalesCaja();
@@ -1352,7 +1424,7 @@ function posApp() {
                         caja_sesion_id: this.sesionId,
                         monto_contado_fisico: this.efectivoReal,
                         monto_a_retirar: this.montoARetirar,
-                        notas: this.notasCorte
+                        notes: this.notasCorte
                     })
                 });
                 const data = await res.json();
@@ -1378,6 +1450,46 @@ function posApp() {
                 this.errorCorte = 'Error de conexión. Verifica el servidor.';
             } finally {
                 this.cargandoCorte = false;
+            }
+        },
+
+        async procesarRetiroCaja() {
+            if (this.cargandoRetiro) return;
+            this.errorRetiro = '';
+            this.cargandoRetiro = true;
+
+            try {
+                const res = await fetch('{{ route('pos.sesion.retiro') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        caja_sesion_id: this.sesionId,
+                        monto: this.montoRetiro,
+                        concepto: this.conceptoRetiro
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.modalRetiro = false;
+                    this.montoRetiro = 0;
+                    this.conceptoRetiro = '';
+
+                    window.dispatchEvent(new CustomEvent('show-toast', { 
+                        detail: { message: data.message || 'Retiro registrado correctamente.', type: 'success' } 
+                    }));
+
+                    // Sincronizar la vista
+                    window.dispatchEvent(new CustomEvent('transaccion-procesada'));
+                } else {
+                    this.errorRetiro = data.message || 'Error al procesar el retiro.';
+                }
+            } catch (e) {
+                this.errorRetiro = 'Error de conexión. Verifica el servidor.';
+            } finally {
+                this.cargandoRetiro = false;
             }
         },
     };

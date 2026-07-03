@@ -121,6 +121,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/sesion/totales',   [PosController::class, 'obtenerTotalesSesionJson'])->name('sesion.totales');
         Route::post('/sesion/cerrar',   [PosController::class, 'cerrarSesion'])->name('cerrarSesion');
         Route::post('/sesion/corte',    [PosController::class, 'cerrarCaja'])->name('cerrarCaja');
+        Route::post('/sesion/retiro',   [PosController::class, 'registrarRetiro'])->name('sesion.retiro');
     });
 
     // ─── Cotizaciones ─────────────────────────────────────────────────────────────

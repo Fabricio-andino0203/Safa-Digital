@@ -138,7 +138,7 @@ class ReporteController extends Controller
                 'venta_pos_detalles.nombre_snapshot as nombre_item',
                 'venta_pos_detalles.cantidad',
                 'venta_pos_detalles.precio_unitario as precio_venta',
-                'producto_variantes.costo as costo_unitario'
+                DB::raw('COALESCE(venta_pos_detalles.costo_unitario, producto_variantes.costo, 0.00) as costo_unitario')
             )
             ->whereBetween('ventas_pos.created_at', [$inicio, $fin])
             ->where('ventas_pos.estado', 'completada')

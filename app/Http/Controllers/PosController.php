@@ -224,17 +224,25 @@ class PosController extends Controller
                 $extrasSnap = [];
                 if (!empty($item['extras'])) {
                     foreach ($item['extras'] as $ex) {
-                        $extrasCost += floatval($ex['costo'] ?? 0);
-                        $extrasPrice += floatval($ex['precio'] ?? 0);
+                        // Buscar el registro en base de datos para obtener el costo real del extra
+                        $extraRecord = \DB::table('producto_extras')->find($ex['id'] ?? null);
+                        $costoExtra = $extraRecord ? floatval($extraRecord->costo) : floatval($ex['costo'] ?? 0);
+                        $precioExtra = $extraRecord ? floatval($extraRecord->precio) : floatval($ex['precio'] ?? 0);
+
+                        $extrasCost += $costoExtra;
+                        $extrasPrice += $precioExtra;
                         $extrasSnap[] = [
+                            'id'     => $ex['id'] ?? null,
                             'nombre' => $ex['nombre'],
-                            'costo'  => floatval($ex['costo'] ?? 0),
-                            'precio' => floatval($ex['precio'] ?? 0),
+                            'costo'  => $costoExtra,
+                            'precio' => $precioExtra,
                         ];
                     }
                 }
 
                 $precioTotal = $variante->precio + $extrasPrice;
+                // Costo acumulativo: costo base de la variante + costos de los extras (Tarea 1)
+                $costoTotalUnitario = floatval($variante->costo ?? 0.00) + $extrasCost;
                 $linea     = $precioTotal * $item['qty'];
                 $subtotal += $linea;
 
@@ -242,6 +250,7 @@ class PosController extends Controller
                     'variante' => $variante,
                     'cantidad' => $item['qty'],
                     'precio'   => (float) $precioTotal,
+                    'costo'    => (float) $costoTotalUnitario,
                     'linea'    => $linea,
                     'extras'   => $extrasSnap,
                 ];
@@ -310,6 +319,7 @@ class PosController extends Controller
                     'sku_snapshot'   => $item['variante']->sku,
                     'cantidad'       => $item['cantidad'],
                     'precio_unitario'=> $item['precio'],
+                    'costo_unitario' => $item['costo'],
                     'descuento_linea'=> 0,
                     'subtotal'       => $item['linea'],
                     'extras'         => $item['extras'],
@@ -791,10 +801,48 @@ class PosController extends Controller
         ]);
 
         $totales = $this->obtenerTotalesSesion($request->caja_sesion_id);
-
+ 
         return response()->json([
             'success' => true,
             'totales' => $totales
         ]);
+    }
+
+    public function registrarRetiro(Request $request)
+    {
+        $request->validate([
+            'caja_sesion_id' => 'required|exists:caja_sesiones,id',
+            'monto'          => 'required|numeric|min:0.01',
+            'concepto'       => 'required|string|max:255',
+        ]);
+
+        try {
+            $sesion = CajaSesion::findOrFail($request->caja_sesion_id);
+            if ($sesion->estado !== 'abierta') {
+                throw new \Exception('La sesión de caja está cerrada.');
+            }
+
+            // Registrar movimiento de egreso hacia bancos (tipo: egreso, referencia: Bancos)
+            $movimiento = CajaMovimiento::create([
+                'caja_sesion_id' => $sesion->id,
+                'tipo'           => 'egreso',
+                'monto'          => $request->monto,
+                'concepto'       => 'Gasto: ' . $request->concepto,
+                'referencia'     => 'Bancos',
+                'fecha'          => now()->toDateString(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Retiro registrado correctamente en Bancos (Gasto).',
+                'movimiento' => $movimiento
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
     }
 }
