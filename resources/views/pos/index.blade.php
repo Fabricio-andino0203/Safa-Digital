@@ -809,7 +809,7 @@
 
     <!-- Toast Notification Banner -->
     <div x-data="{ show: false, message: '', type: 'success' }"
-         @show-toast.window="message = $event.detail.message; type = $event.detail.type || 'success'; show = true; setTimeout(() => show = false, 3500)"
+         x-on:show-toast.window="message = $event.detail.message; type = $event.detail.type || 'success'; show = true; setTimeout(() => show = false, 3500)"
          x-show="show"
          x-transition
          x-cloak
