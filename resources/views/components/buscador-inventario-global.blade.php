@@ -109,10 +109,15 @@
                              <template x-for="v in productoSeleccionado?.variantes" :key="v.id">
                                  <button type="button" @click="varianteSeleccionada = v"
                                          :class="varianteSeleccionada?.id === v.id ? 'border-neutral-950 bg-neutral-950 text-white ring-2 ring-neutral-950/20' : 'border-neutral-200 bg-white text-neutral-800 hover:border-neutral-400'"
-                                         class="p-3 rounded-xl border text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-1">
-                                     <span x-text="v.nombre_completo"></span>
-                                     <span class="text-[10px]" :class="varianteSeleccionada?.id === v.id ? 'text-neutral-200' : 'text-neutral-400'" x-text="'SKU: ' + v.sku"></span>
-                                     <span class="text-xs font-black mt-1" x-text="'L. ' + Number(v.precio).toFixed(2)"></span>
+                                         class="p-3 rounded-xl border text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-2">
+                                     <img :src="v.imagen || productoSeleccionado?.imagen || 'https://ui-avatars.com/api/?name=V&color=7F9CF5&background=EBF4FF'"
+                                          class="w-10 h-10 object-cover rounded-lg border border-neutral-200/60 shadow-sm"
+                                          alt="Miniatura">
+                                     <div class="flex flex-col items-center">
+                                         <span x-text="v.nombre_completo"></span>
+                                         <span class="text-[10px]" :class="varianteSeleccionada?.id === v.id ? 'text-neutral-200' : 'text-neutral-400'" x-text="'SKU: ' + v.sku"></span>
+                                         <span class="text-xs font-black mt-1" x-text="'L. ' + Number(v.precio).toFixed(2)"></span>
+                                     </div>
                                  </button>
                              </template>
                          </div>

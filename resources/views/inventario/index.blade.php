@@ -30,7 +30,15 @@
             <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 9.414V5a2 2 0 012-2zm0 0v4"/>
             </svg>
-            Categoría
+            Categorías
+        </button>
+        <button @click="abrirModalExtras()"
+                class="px-4 py-2.5 text-sm font-medium border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0"/>
+            </svg>
+            Extras
         </button>
         <button @click="abrirModalProducto()"
                 class="px-4 py-2.5 bg-neutral-900 text-white text-sm font-medium rounded-xl hover:bg-neutral-800 transition-colors shadow-sm flex items-center gap-2">
@@ -641,24 +649,175 @@
 <div x-show="modalCategoria" x-cloak
      class="fixed inset-0 z-50 bg-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4"
      @keydown.escape.window="modalCategoria = false">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm border border-neutral-100">
-        <div class="px-7 py-5 border-b border-neutral-100 flex items-center justify-between">
-            <h3 class="text-base font-bold">Nueva Categoría</h3>
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl border border-neutral-100 overflow-hidden flex flex-col max-h-[85vh]">
+        <div class="px-7 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+            <h3 class="text-base font-bold text-neutral-900" x-text="formCategoria.id ? 'Editar Categoría' : 'Nueva Categoría'"></h3>
             <button @click="modalCategoria = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-        <div class="p-7 space-y-4">
-            <div>
-                <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Nombre *</label>
-                <input type="text" x-model="formCategoria.nombre" placeholder="Ej. Camisas, Tazas, Cobertores"
-                       class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-400 transition-colors"/>
+        
+        <div class="flex flex-1 overflow-hidden divide-x divide-neutral-150">
+            <!-- Columna Izquierda: Formulario -->
+            <div class="w-1/2 p-6 overflow-y-auto space-y-4 flex flex-col">
+                <div>
+                    <label class="block text-xs font-semibold text-neutral-500 mb-1.5 uppercase tracking-wider">Nombre de Categoría *</label>
+                    <input type="text" x-model="formCategoria.nombre" placeholder="Ej. Camisas, Tazas, Cobertores"
+                           class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-900 bg-[#FAFAFA] focus:bg-white transition-colors"/>
+                </div>
+
+                <!-- Extras Predeterminados -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider">Extras Predeterminados (Herencia)</label>
+                    <div class="bg-neutral-50 border border-neutral-200/65 rounded-2xl p-4 max-h-[200px] overflow-y-auto space-y-2">
+                        <template x-for="ext in extrasList" :key="ext.id">
+                            <label class="flex items-center gap-3 px-1 py-0.5 cursor-pointer select-none group">
+                                <input type="checkbox" :value="String(ext.id)" x-model="formCategoria.extras"
+                                       class="rounded border-neutral-300 text-neutral-950 focus:ring-neutral-950 w-4 h-4"/>
+                                <div class="flex-1 min-w-0">
+                                    <span class="text-xs font-bold text-neutral-800 block" x-text="ext.nombre"></span>
+                                    <span class="text-[10px] text-neutral-400 font-semibold" x-text="'L. ' + Number(ext.precio).toFixed(2)"></span>
+                                </div>
+                            </label>
+                        </template>
+                        <template x-if="extrasList.length === 0">
+                            <div class="text-center text-xs text-neutral-400 italic py-4">No hay extras configurados en el sistema.</div>
+                        </template>
+                    </div>
+                </div>
+
+                <div x-show="errorForm" x-cloak class="text-xs text-red-650 bg-red-50 border border-red-100 rounded-xl px-4 py-3" x-text="errorForm"></div>
+
+                <div class="pt-4 flex gap-2">
+                    <template x-if="formCategoria.id">
+                        <button type="button" @click="cancelarEdicionCategoria()"
+                                class="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-semibold rounded-2xl text-xs transition-all">
+                            Cancelar
+                        </button>
+                    </template>
+                    <button @click="guardarCategoria()" :disabled="guardando"
+                            class="flex-2 py-3 bg-neutral-900 text-white font-semibold rounded-2xl hover:bg-neutral-800 disabled:opacity-50 transition-all text-xs flex-1">
+                        <span x-text="guardando ? 'Guardando...' : (formCategoria.id ? 'Guardar Cambios' : 'Crear Categoría')"></span>
+                    </button>
+                </div>
             </div>
-            <div x-show="errorForm" x-cloak class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3" x-text="errorForm"></div>
-            <button @click="guardarCategoria()" :disabled="guardando"
-                    class="w-full py-3 bg-neutral-900 text-white font-semibold rounded-2xl hover:bg-neutral-800 disabled:opacity-50 transition-all">
-                <span x-text="guardando ? 'Guardando...' : 'Crear Categoría'"></span>
+
+            <!-- Columna Derecha: Categorías Existentes -->
+            <div class="w-1/2 p-6 bg-neutral-50/50 overflow-y-auto flex flex-col">
+                <label class="block text-xs font-semibold text-neutral-500 mb-3 uppercase tracking-wider">Categorías Existentes</label>
+                <div class="space-y-2 flex-1 overflow-y-auto">
+                    <template x-for="cat in categorias" :key="cat.id">
+                        <div class="p-3 bg-white border border-neutral-100 rounded-2xl shadow-sm flex items-center justify-between gap-3 group">
+                            <div class="min-w-0 flex-1">
+                                <span class="text-xs font-bold text-neutral-800 block truncate" x-text="cat.nombre"></span>
+                                <!-- Extras configurados en la categoría -->
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    <template x-for="ex in cat.extras" :key="ex.id">
+                                        <span class="px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 rounded text-[9px] font-medium text-neutral-600" x-text="ex.nombre"></span>
+                                    </template>
+                                    <template x-if="!cat.extras || cat.extras.length === 0">
+                                        <span class="text-[9px] text-neutral-400 italic">Sin extras heredados</span>
+                                    </template>
+                                </div>
+                            </div>
+                            <button type="button" @click="cargarCategoriaParaEditar(cat)"
+                                    class="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-900 hover:text-white text-neutral-700 text-[10px] font-bold rounded-lg transition-all flex-shrink-0">
+                                Editar
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ══════════════════════════════════════════════════════════════════
+     MODAL: GESTOR DE EXTRAS
+══════════════════════════════════════════════════════════════════ --}}
+<div x-show="modalExtras" x-cloak
+     class="fixed inset-0 z-50 bg-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+     @keydown.escape.window="modalExtras = false">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl border border-neutral-100 overflow-hidden flex flex-col max-h-[85vh]">
+        <div class="px-7 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+            <h3 class="text-base font-bold text-neutral-900" x-text="formExtra.id ? 'Editar Extra Base' : 'Nuevo Extra Base'"></h3>
+            <button @click="modalExtras = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
+        </div>
+        
+        <div class="flex flex-1 overflow-hidden divide-x divide-neutral-150">
+            <!-- Columna Izquierda: Formulario -->
+            <div class="w-1/2 p-6 overflow-y-auto space-y-4 flex flex-col justify-between">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-neutral-500 mb-1.5 uppercase tracking-wider">Nombre del Extra *</label>
+                        <input type="text" x-model="formExtra.nombre" placeholder="Ej. Vinil Textil, DTF A4, Bordado"
+                               class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-900 bg-[#FAFAFA] focus:bg-white transition-colors"/>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-neutral-500 mb-1.5 uppercase tracking-wider">Costo (L.) *</label>
+                            <input type="number" step="0.01" x-model="formExtra.costo" placeholder="0.00"
+                                   class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-900 bg-[#FAFAFA] focus:bg-white transition-colors"/>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-neutral-500 mb-1.5 uppercase tracking-wider">Precio Venta (L.) *</label>
+                            <input type="number" step="0.01" x-model="formExtra.precio" placeholder="0.00"
+                                   class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-900 bg-[#FAFAFA] focus:bg-white transition-colors"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4 pt-4">
+                    <div x-show="errorFormExtra" x-cloak class="text-xs text-red-650 bg-red-50 border border-red-100 rounded-xl px-4 py-3" x-text="errorFormExtra"></div>
+
+                    <div class="flex gap-2">
+                        <template x-if="formExtra.id">
+                            <button type="button" @click="cancelarEdicionExtra()"
+                                    class="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-semibold rounded-2xl text-xs transition-all">
+                                Cancelar
+                            </button>
+                        </template>
+                        <button @click="guardarExtra()" :disabled="guardandoExtra"
+                                class="flex-2 py-3 bg-neutral-900 text-white font-semibold rounded-2xl hover:bg-neutral-800 disabled:opacity-50 transition-all text-xs flex-1">
+                            <span x-text="guardandoExtra ? 'Guardando...' : (formExtra.id ? 'Guardar Cambios' : 'Crear Extra')"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Extras Existentes -->
+            <div class="w-1/2 p-6 bg-neutral-50/50 overflow-y-auto flex flex-col">
+                <label class="block text-xs font-semibold text-neutral-500 mb-3 uppercase tracking-wider">Extras Base Activos</label>
+                <div class="space-y-2 flex-1 overflow-y-auto">
+                    <template x-for="ext in extrasList" :key="ext.id">
+                        <div class="p-3 bg-white border border-neutral-100 rounded-2xl shadow-sm flex items-center justify-between gap-3 group">
+                            <div class="min-w-0 flex-1">
+                                <span class="text-xs font-bold text-neutral-800 block truncate" x-text="ext.nombre"></span>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-[10px] text-neutral-400 font-semibold" x-text="'Costo: L. ' + Number(ext.costo || 0).toFixed(2)"></span>
+                                    <span class="text-[10px] text-neutral-500 font-bold" x-text="'Precio: L. ' + Number(ext.precio || 0).toFixed(2)"></span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-shrink-0">
+                                <button type="button" @click="cargarExtraParaEditar(ext)"
+                                        class="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-900 hover:text-white text-neutral-700 text-[10px] font-bold rounded-lg transition-all">
+                                    Editar
+                                </button>
+                                <button type="button" @click="eliminarExtra(ext)"
+                                        class="px-2.5 py-1.5 bg-red-50 hover:bg-red-650 hover:text-white text-red-650 text-[10px] font-bold rounded-lg transition-all border border-red-100/50">
+                                    Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="extrasList.length === 0">
+                        <div class="text-center text-xs text-neutral-400 italic py-8">No hay extras base creados en el sistema.</div>
+                    </template>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -711,6 +870,7 @@ function inventarioApp() {
         // ── Estado ──────────────────────────────────────────────────────────
         todos:             @json($productos),
         categorias:        @json($categorias),   // ← reactivo: se actualiza al crear
+        extrasList:        @json($extras),
         productosFiltrados: [],
         expandidos:        [],
         busqueda:          '',
@@ -721,12 +881,14 @@ function inventarioApp() {
         modalVariante:  false,
         modalStock:     false,
         modalCategoria: false,
+        modalExtras:    false,
         modalImportarExcel: false,
 
         // Forms
         formProducto:  { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '', extras: [] },
         formVariante:  { id: null, producto_id: null, sku: '', atributos: [], costo: 0, precio: 0, stock_fisico: 0, stock_minimo: 0, imagen: '' },
-        formCategoria: { nombre: '' },
+        formCategoria: { id: null, nombre: '', extras: [] },
+        formExtra:     { id: null, nombre: '', costo: '', precio: '' },
         ajusteStock:   { cantidad: 0 },
 
         productoActivo: null,
@@ -734,8 +896,10 @@ function inventarioApp() {
 
         // UI States
         guardando: false,
+        guardandoExtra: false,
         subiendoImagen: false,
         errorForm: '',
+        errorFormExtra: '',
         toast: { visible: false, mensaje: '', tipo: 'ok' },
 
         // ── Init ────────────────────────────────────────────────────────────
@@ -982,9 +1146,23 @@ function inventarioApp() {
 
         // ── Modal Categoría ──────────────────────────────────────────────────
         abrirModalCategoria() {
-            this.formCategoria = { nombre: '' };
+            this.formCategoria = { id: null, nombre: '', extras: [] };
             this.errorForm = '';
             this.modalCategoria = true;
+        },
+
+        cargarCategoriaParaEditar(cat) {
+            this.formCategoria = {
+                id: cat.id,
+                nombre: cat.nombre,
+                extras: (cat.extras || []).map(e => String(e.id))
+            };
+            this.errorForm = '';
+        },
+
+        cancelarEdicionCategoria() {
+            this.formCategoria = { id: null, nombre: '', extras: [] };
+            this.errorForm = '';
         },
 
         async guardarCategoria() {
@@ -995,16 +1173,82 @@ function inventarioApp() {
                 const res  = await this._fetch('/inventario/categorias', 'POST', this.formCategoria);
                 const data = await res.json();
                 if (data.success) {
-                    // Agregar la nueva categoría al estado reactivo — sin recargar
-                    this.categorias.push(data.categoria);
-                    this.formCategoria = { nombre: '' };
+                    const idx = this.categorias.findIndex(c => c.id === data.categoria.id);
+                    if (idx !== -1) {
+                        this.categorias[idx] = data.categoria;
+                    } else {
+                        this.categorias.push(data.categoria);
+                    }
+                    this.formCategoria = { id: null, nombre: '', extras: [] };
                     this.modalCategoria = false;
-                    this.mostrarToast('Categoría "' + data.categoria.nombre + '" creada correctamente.');
+                    this.mostrarToast('Categoría guardada correctamente.');
                 } else {
-                    this.errorForm = data.message || 'Error al crear.';
+                    this.errorForm = data.message || 'Error al guardar.';
                 }
             } catch(e) { this.errorForm = 'Error de conexión.'; }
             finally { this.guardando = false; }
+        },
+
+        // ── Modal Extras Base ────────────────────────────────────────────────
+        abrirModalExtras() {
+            this.formExtra = { id: null, nombre: '', costo: '', precio: '' };
+            this.errorFormExtra = '';
+            this.modalExtras = true;
+        },
+
+        cargarExtraParaEditar(ext) {
+            this.formExtra = {
+                id: ext.id,
+                nombre: ext.nombre,
+                costo: ext.costo,
+                precio: ext.precio
+            };
+            this.errorFormExtra = '';
+        },
+
+        cancelarEdicionExtra() {
+            this.formExtra = { id: null, nombre: '', costo: '', precio: '' };
+            this.errorFormExtra = '';
+        },
+
+        async guardarExtra() {
+            if (!this.formExtra.nombre.trim()) { this.errorFormExtra = 'El nombre es requerido.'; return; }
+            if (this.formExtra.costo === '' || this.formExtra.precio === '') { this.errorFormExtra = 'Costo y precio son requeridos.'; return; }
+            this.guardandoExtra = true;
+            this.errorFormExtra = '';
+            try {
+                const res  = await this._fetch('/inventario/extras', 'POST', this.formExtra);
+                const data = await res.json();
+                if (data.success) {
+                    const idx = this.extrasList.findIndex(e => e.id === data.extra.id);
+                    if (idx !== -1) {
+                        this.extrasList[idx] = data.extra;
+                    } else {
+                        this.extrasList.push(data.extra);
+                    }
+                    this.formExtra = { id: null, nombre: '', costo: '', precio: '' };
+                    this.mostrarToast('Extra guardado correctamente.');
+                } else {
+                    this.errorFormExtra = data.message || 'Error al guardar.';
+                }
+            } catch(e) { this.errorFormExtra = 'Error de conexión.'; }
+            finally { this.guardandoExtra = false; }
+        },
+
+        async eliminarExtra(ext) {
+            if (!confirm(`¿Estás seguro de que deseas eliminar el extra "${ext.nombre}"?`)) return;
+            try {
+                const res = await this._fetch(`/inventario/extras/${ext.id}`, 'DELETE');
+                const data = await res.json();
+                if (data.success) {
+                    this.extrasList = this.extrasList.filter(e => e.id !== ext.id);
+                    this.mostrarToast('Extra eliminado correctamente.');
+                } else {
+                    alert(data.message || 'No se pudo eliminar el extra.');
+                }
+            } catch (e) {
+                this.mostrarToast('Error de conexión al eliminar.', 'error');
+            }
         },
 
         async eliminarProducto(producto) {

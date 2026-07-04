@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\ProductoVariante;
+use App\Models\ProductoExtra;
 use App\Models\AjusteStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,8 +20,9 @@ class InventarioController extends Controller
     {
         $productos  = Producto::with(['categoria', 'variantes', 'extras'])->where('activo', true)->orderBy('nombre')->get();
         $categorias = Categoria::with('extras')->orderBy('nombre')->get();
+        $extras     = ProductoExtra::whereNull('producto_id')->orderBy('nombre')->get();
 
-        return view('inventario.index', compact('productos', 'categorias'));
+        return view('inventario.index', compact('productos', 'categorias', 'extras'));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -238,15 +240,59 @@ class InventarioController extends Controller
 
     public function storeCategorias(Request $request)
     {
+        $id = $request->get('id');
+
         $validated = $request->validate([
-            'nombre'      => 'required|string|max:100|unique:categorias,nombre',
+            'nombre'      => 'required|string|max:100|unique:categorias,nombre,' . ($id ?: 'NULL'),
             'descripcion' => 'nullable|string|max:500',
             'icono'       => 'nullable|string|max:50',
         ]);
 
-        $categoria = Categoria::create($validated);
+        if ($id) {
+            $categoria = Categoria::findOrFail($id);
+            $categoria->update($validated);
+        } else {
+            $categoria = Categoria::create($validated);
+        }
 
-        return response()->json(['success' => true, 'categoria' => $categoria]);
+        $extrasSeleccionados = $request->get('extras', []);
+        $categoria->extras()->sync($extrasSeleccionados);
+
+        return response()->json([
+            'success' => true, 
+            'categoria' => $categoria->load('extras')
+        ]);
+    }
+
+    public function storeExtras(Request $request)
+    {
+        $id = $request->get('id');
+
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'costo'  => 'required|numeric|min:0',
+            'precio' => 'required|numeric|min:0',
+        ]);
+
+        if ($id) {
+            $extra = ProductoExtra::findOrFail($id);
+            $extra->update($validated);
+        } else {
+            $extra = ProductoExtra::create(array_merge($validated, ['producto_id' => null]));
+        }
+
+        return response()->json([
+            'success' => true, 
+            'extra' => $extra
+        ]);
+    }
+
+    public function destroyExtra($id)
+    {
+        $extra = ProductoExtra::findOrFail($id);
+        $extra->delete();
+
+        return response()->json(['success' => true]);
     }
 
     // ══════════════════════════════════════════════════════════════════════════

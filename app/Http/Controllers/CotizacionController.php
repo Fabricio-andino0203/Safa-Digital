@@ -72,12 +72,30 @@ class CotizacionController extends Controller
                 $lineSubtotal = $det['precio_venta'] * $det['cantidad'];
                 $subtotal += $lineSubtotal;
 
+                $costoTotal = 0;
+                if ($det['tipo_producto'] === 'Inventario' && !empty($det['producto_variante_id'])) {
+                    $variante = ProductoVariante::find($det['producto_variante_id']);
+                    if ($variante) {
+                        $costoTotal = floatval($variante->costo ?? 0);
+                        if (!empty($det['extras'])) {
+                            foreach ($det['extras'] as $ex) {
+                                $extraRecord = \DB::table('producto_extras')->find($ex['id'] ?? null);
+                                $costoExtra = $extraRecord ? floatval($extraRecord->costo) : 0;
+                                $cantidadExtra = max(1, intval($ex['cantidad'] ?? 1));
+                                $costoTotal += $costoExtra * $cantidadExtra;
+                            }
+                        }
+                    }
+                } else {
+                    $costoTotal = $det['costo_libre'] ?? 0;
+                }
+
                 $detallesValidos[] = [
                     'tipo_producto' => $det['tipo_producto'],
                     'producto_variante_id' => $det['producto_variante_id'] ?? null,
                     'nombre_libre' => $det['nombre_libre'] ?? null,
                     'descripcion_libre' => $det['descripcion_libre'] ?? null,
-                    'costo_libre' => $det['costo_libre'] ?? 0,
+                    'costo_libre' => $costoTotal,
                     'precio_venta' => $det['precio_venta'],
                     'cantidad' => $det['cantidad'],
                     'subtotal' => $lineSubtotal,

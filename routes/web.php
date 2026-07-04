@@ -98,6 +98,10 @@ Route::middleware('auth')->group(function () {
         // Categorías
         Route::post('/categorias', [InventarioController::class, 'storeCategorias'])->name('storeCategorias');
 
+        // Extras
+        Route::post('/extras', [InventarioController::class, 'storeExtras'])->name('storeExtras');
+        Route::delete('/extras/{id}', [InventarioController::class, 'destroyExtra'])->name('destroyExtra');
+
         // Importación de Excel
         Route::post('/importar-excel', [InventarioController::class, 'importExcel'])->name('importarExcel');
 

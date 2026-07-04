@@ -113,14 +113,16 @@
                 @foreach($pedido->detalles as $detalle)
                 <li class="py-3 flex justify-between items-start">
                     <div class="flex flex-col">
-                        <span class="font-medium text-neutral-900">{{ $detalle->variante->producto->nombre }}</span>
-                        @if($detalle->variante->nombre != 'Única')
-                        <span class="text-xs text-neutral-500">{{ $detalle->variante->nombre }}</span>
+                        <span class="font-medium text-neutral-900">
+                            {{ $detalle->tipo_producto === 'Inventario' ? ($detalle->nombre_snapshot ?? ($detalle->variante->producto->nombre ?? 'Producto')) : $detalle->nombre_libre }}
+                        </span>
+                        @if($detalle->tipo_producto === 'Libre' && $detalle->descripcion_libre)
+                        <span class="text-xs text-neutral-500">{{ $detalle->descripcion_libre }}</span>
                         @endif
                     </div>
                     <div class="flex items-center space-x-3">
                         <span class="text-sm text-neutral-500">x{{ $detalle->cantidad }}</span>
-                        <span class="font-semibold text-neutral-900">L.{{ number_format($detalle->importe, 2) }}</span>
+                        <span class="font-semibold text-neutral-900">L.{{ number_format($detalle->subtotal, 2) }}</span>
                     </div>
                 </li>
                 @endforeach
@@ -146,17 +148,17 @@
                 
                 <div class="flex justify-between text-lg font-bold text-neutral-900 pt-2 border-t border-neutral-100">
                     <span>Total</span>
-                    <span>L.{{ number_format($pedido->total, 2) }}</span>
+                    <span>L.{{ number_format($pedido->total_pedido, 2) }}</span>
                 </div>
                 
                 <div class="flex justify-between text-emerald-600 pt-2">
                     <span>Abonado</span>
-                    <span>L.{{ number_format($pedido->abonado, 2) }}</span>
+                    <span>L.{{ number_format($pedido->total_abonado, 2) }}</span>
                 </div>
                 
                 <div class="flex justify-between text-xl font-black text-neutral-900 pt-3 border-t border-neutral-100">
                     <span>Saldo Pendiente</span>
-                    <span>L.{{ number_format($pedido->total - $pedido->abonado, 2) }}</span>
+                    <span>L.{{ number_format($pedido->saldo_pendiente, 2) }}</span>
                 </div>
             </div>
         </div>

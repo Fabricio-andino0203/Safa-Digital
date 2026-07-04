@@ -197,11 +197,15 @@
 
                                          <!-- Valores de Venta / Costo / Cantidad -->
                                          <div class="grid grid-cols-12 gap-4">
-                                             <!-- Costo (Requerido para libres y mostrado para inventario) -->
-                                             <div class="col-span-12 md:col-span-4">
-                                                 <label class="block text-xs font-semibold text-neutral-500 mb-1">Costo Unit. (L.) *</label>
-                                                 <input type="number" step="0.01" min="0" x-model.number="item.costo_libre" :disabled="item.tipo_producto === 'Inventario'" required class="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none bg-white text-right disabled:bg-neutral-100 disabled:text-neutral-500">
-                                             </div>
+                                            @if(auth()->id() === 1 || auth()->user()->rol === 'administrador')
+                                              <!-- Costo (Requerido para libres y mostrado para inventario) -->
+                                              <div class="col-span-12 md:col-span-4">
+                                                  <label class="block text-xs font-semibold text-neutral-500 mb-1">Costo Unit. (L.) *</label>
+                                                  <input type="number" step="0.01" min="0" x-model.number="item.costo_libre" :disabled="item.tipo_producto === 'Inventario'" required class="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none bg-white text-right disabled:bg-neutral-100 disabled:text-neutral-500">
+                                              </div>
+                                            @else
+                                              <input type="hidden" x-model.number="item.costo_libre">
+                                            @endif
                                              <!-- Venta -->
                                              <div class="col-span-12 md:col-span-4">
                                                  <label class="block text-xs font-semibold text-neutral-500 mb-1">Precio Venta (L.) *</label>
@@ -215,10 +219,14 @@
                                          </div>
 
                                          <div class="flex justify-between items-center text-xs font-medium text-neutral-500 pt-2 border-t border-neutral-100">
+                                             @if(auth()->id() === 1 || auth()->user()->rol === 'administrador')
                                              <div>
                                                  <span>Margen Ganancia: </span>
                                                  <span class="font-bold" :class="(item.precio_venta - item.costo_libre) >= 0 ? 'text-green-600' : 'text-red-500'" x-text="'L.' + ((item.precio_venta - item.costo_libre) * item.cantidad).toFixed(2)"></span>
                                              </div>
+                                             @else
+                                             <div></div>
+                                             @endif
                                              <div class="text-sm font-bold text-neutral-900">
                                                  Subtotal: L.<span x-text="(item.precio_venta * item.cantidad).toFixed(2)"></span>
                                              </div>
@@ -348,6 +356,7 @@
                                                     <span class="text-neutral-400">Total Venta</span>
                                                     <span class="font-bold text-neutral-200" x-text="'L.' + Number(cotizacionSeleccionada.total).toFixed(2)"></span>
                                                 </div>
+                                                @if(auth()->id() === 1 || auth()->user()->rol === 'administrador')
                                                 <div class="flex justify-between text-xs">
                                                     <span class="text-neutral-400">Costo Estimado</span>
                                                     <span class="font-bold text-neutral-200" x-text="'L.' + obtenerCostoTotal(cotizacionSeleccionada).toFixed(2)"></span>
@@ -357,6 +366,7 @@
                                                     <span class="text-2xl font-black text-green-400" x-text="'L.' + (cotizacionSeleccionada.total - obtenerCostoTotal(cotizacionSeleccionada)).toFixed(2)"></span>
                                                 </div>
                                                 <div class="text-[10px] text-right text-green-300 font-bold" x-text="'Margin %: ' + obtenerMargenPorcentaje(cotizacionSeleccionada) + '%'"></div>
+                                                @endif
                                             </div>
                                         </div>
 
