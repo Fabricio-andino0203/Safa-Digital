@@ -471,4 +471,19 @@ class PedidoController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
+
+    public function descargarArchivo($id)
+    {
+        $archivo = PedidoArchivo::findOrFail($id);
+
+        if (Storage::disk('public')->exists($archivo->ruta)) {
+            return Storage::disk('public')->download($archivo->ruta, $archivo->nombre_original);
+        }
+
+        if (Storage::disk('local')->exists($archivo->ruta)) {
+            return Storage::disk('local')->download($archivo->ruta, $archivo->nombre_original);
+        }
+
+        abort(404, 'Archivo no encontrado.');
+    }
 }

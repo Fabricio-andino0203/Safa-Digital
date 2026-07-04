@@ -560,7 +560,7 @@
                                                         <!-- Overlay Oscuro en Hover -->
                                                         <div class="absolute inset-0 bg-neutral-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-3">
                                                             <span class="text-[10px] text-white font-medium truncate w-full text-center mb-3" x-text="a.nombre_original"></span>
-                                                            <a :href="a.url" target="_blank" download class="p-2.5 bg-white rounded-full text-neutral-900 hover:scale-110 transition-transform shadow-lg">
+                                                            <a :href="'/pedidos/archivo/' + a.id + '/download'" target="_blank" download class="p-2.5 bg-white rounded-full text-neutral-900 hover:scale-110 transition-transform shadow-lg">
                                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                                             </a>
                                                         </div>
