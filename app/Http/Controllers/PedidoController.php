@@ -112,8 +112,22 @@ class PedidoController extends Controller
                     $variante = ProductoVariante::lockForUpdate()->findOrFail($item['producto_variante_id']);
                     $variante->reservar($item['cantidad']); // Incrementa stock_reservado
 
+                    $nombreSnapshot = $variante->nombre_completo;
+                    if (!empty($item['extras'])) {
+                        $partesExtras = [];
+                        foreach ($item['extras'] as $ex) {
+                            $qty = intval($ex['cantidad'] ?? 1);
+                            if ($qty > 1) {
+                                $partesExtras[] = "{$qty}x {$ex['nombre']}";
+                            } else {
+                                $partesExtras[] = $ex['nombre'];
+                            }
+                        }
+                        $nombreSnapshot .= ' (' . implode(', ', $partesExtras) . ')';
+                    }
+
                     $detalleData['producto_variante_id'] = $variante->id;
-                    $detalleData['nombre_snapshot']      = $variante->nombre_completo;
+                    $detalleData['nombre_snapshot']      = $nombreSnapshot;
                     $detalleData['sku_snapshot']         = $variante->sku;
                     $detalleData['precio_unitario']      = $variante->precio;
                 } else {

@@ -47,7 +47,9 @@ class PosController extends Controller
             return [
                 'id'       => $producto->id,
                 'nombre'   => $producto->nombre,
-                'categoria'=> $producto->categoria?->nombre ?? 'Sin categoría',
+                'categoria'=> $producto->categoria ? [
+                    'nombre' => $producto->categoria->nombre
+                ] : null,
                 'imagen'   => $producto->imagen,
                 'extras'   => $extrasDisponibles->map(function ($e) {
                     return [

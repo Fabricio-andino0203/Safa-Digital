@@ -271,25 +271,38 @@
                                                         <div class="col-span-12 md:col-span-8">
                                                             <template x-if="item.tipo_producto === 'Inventario'">
                                                                 <div>
-                                                                    <label class="block text-xs font-semibold text-neutral-500 mb-1">Variante *</label>
-                                                                    <select x-model="item.producto_variante_id" @change="cargarPrecio(index)" required class="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none bg-white">
-                                                                        <option value="">Selecciona una variante...</option>
-                                                                        @foreach(\App\Models\ProductoVariante::where('activo', true)->get() as $v)
-                                                                            <option value="{{ $v->id }}" data-precio="{{ $v->precio }}">{{ $v->sku }} - {{ $v->nombre_completo }}</option>
-                                                                        @endforeach
-                                                                    </select>
+                                                                    <label class="block text-xs font-semibold text-neutral-500 mb-1">Producto / Variante *</label>
+                                                                    <button type="button" @click="itemIndexBuscando = index; modalBusquedaInventario = true; busquedaInventario = ''"
+                                                                            class="w-full text-left rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none bg-white hover:bg-neutral-50 transition-colors flex items-center justify-between">
+                                                                        <span x-text="item.producto_variante_id ? (variantesList.find(v => v.id == item.producto_variante_id)?.sku + ' - ' + variantesList.find(v => v.id == item.producto_variante_id)?.nombre_completo) : '🔍 Buscar Producto en Inventario'"
+                                                                              :class="item.producto_variante_id ? 'text-neutral-900 font-bold' : 'text-neutral-400 font-semibold'"></span>
+                                                                        <svg class="w-4 h-4 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                                                                    </button>
+                                                                    <input type="hidden" x-model="item.producto_variante_id" required />
 
                                                                     <template x-if="item.producto_variante_id && variantesExtras[item.producto_variante_id] && variantesExtras[item.producto_variante_id].length > 0">
-                                                                        <div class="mt-2 space-y-1 bg-white border border-neutral-100 rounded-xl p-2">
+                                                                        <div class="mt-3 space-y-2 bg-white border border-neutral-200/80 rounded-xl p-3">
                                                                             <span class="text-[9px] font-bold text-neutral-400 uppercase tracking-wider block">Extras Disponibles:</span>
-                                                                            <div class="flex flex-wrap gap-1.5 mt-1">
+                                                                            <div class="space-y-1.5 mt-2">
                                                                                 <template x-for="extra in variantesExtras[item.producto_variante_id]" :key="extra.id">
-                                                                                    <label class="inline-flex items-center gap-1 px-2 py-0.5 bg-neutral-50 hover:bg-neutral-100 rounded-lg cursor-pointer transition-colors text-[10px] font-medium text-neutral-600 border border-neutral-100">
-                                                                                        <input type="checkbox" :value="extra" 
-                                                                                               @change="togglePedidoExtra(index, extra)"
-                                                                                               class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-3 h-3"/>
-                                                                                        <span x-text="extra.nombre + ' (+L. ' + Number(extra.precio).toFixed(0) + ')'"></span>
-                                                                                    </label>
+                                                                                    <div class="flex items-center justify-between p-2 bg-neutral-50 rounded-lg border border-neutral-100 transition-all hover:bg-neutral-100/40">
+                                                                                        <div>
+                                                                                            <span class="text-[11px] font-bold text-neutral-800 block" x-text="extra.nombre"></span>
+                                                                                            <span class="text-[9px] font-semibold text-neutral-400" x-text="'L. ' + Number(extra.precio).toFixed(2) + ' c/u'"></span>
+                                                                                        </div>
+                                                                                        <div class="flex items-center gap-1.5 bg-white border border-neutral-200 rounded-md p-1 shadow-sm">
+                                                                                            <button type="button" @click="quitarPedidoExtra(index, extra)"
+                                                                                                    class="w-5 h-5 flex items-center justify-center text-[10px] font-bold bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded transition-colors select-none">
+                                                                                                −
+                                                                                            </button>
+                                                                                            <input type="number" readonly :value="obtenerCantidadPedidoExtra(index, extra.id)"
+                                                                                                   class="w-6 text-center text-[10px] font-bold text-neutral-800 focus:outline-none border-none bg-transparent select-none"/>
+                                                                                            <button type="button" @click="agregarPedidoExtra(index, extra)"
+                                                                                                    class="w-5 h-5 flex items-center justify-center text-[10px] font-bold bg-neutral-900 hover:bg-neutral-800 text-white rounded transition-colors select-none">
+                                                                                                +
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </template>
                                                                             </div>
                                                                         </div>
@@ -806,10 +819,83 @@
         </div>
     </div>
 
+    <!-- Modal: Búsqueda de Inventario (Tarea 3) -->
+    <div x-show="modalBusquedaInventario" class="relative z-[60]" x-cloak>
+        <div x-show="modalBusquedaInventario" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div x-show="modalBusquedaInventario"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     @click.away="modalBusquedaInventario = false"
+                     class="relative w-full max-w-lg transform overflow-hidden rounded-3xl bg-white shadow-2xl border border-neutral-100 flex flex-col max-h-[80vh]">
+                    
+                    <div class="px-7 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
+                        <h3 class="text-base font-bold text-neutral-900">Buscar Producto en Inventario</h3>
+                        <button type="button" @click="modalBusquedaInventario = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="p-6 pb-2">
+                        <div class="relative">
+                            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                            </svg>
+                            <input type="text" x-model="busquedaInventario" placeholder="Buscar por SKU o nombre..."
+                                   class="w-full pl-10 pr-4 py-3 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-neutral-900 bg-[#FAFAFA] focus:bg-white transition-colors"/>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto px-6 pb-6 space-y-2">
+                        <template x-for="v in variantesFiltradas" :key="v.id">
+                            <button type="button" @click="seleccionarVarianteDesdeBuscador(v)"
+                                    class="w-full flex items-center gap-3 p-3 rounded-xl border border-neutral-100 hover:border-neutral-300 hover:bg-neutral-50/50 transition-all text-left group">
+                                
+                                <img :src="v.imagen || 'https://ui-avatars.com/api/?name=P&color=7F9CF5&background=EBF4FF'"
+                                     class="w-10 h-10 object-cover rounded-lg bg-neutral-50 border border-neutral-100" 
+                                     alt="Miniatura">
+                                
+                                <div class="flex-1 overflow-hidden">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-mono text-[10px] bg-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded-md font-bold" x-text="v.sku"></span>
+                                    </div>
+                                    <p class="text-xs font-bold text-neutral-800 truncate mt-1" x-text="v.nombre_completo"></p>
+                                </div>
+
+                                <div class="text-right flex-shrink-0">
+                                    <p class="text-[10px] text-neutral-400 font-semibold uppercase">Precio Base</p>
+                                    <span class="text-xs font-black text-neutral-900" x-text="'L. ' + Number(v.precio).toFixed(2)"></span>
+                                </div>
+                            </button>
+                        </template>
+
+                        <div x-show="variantesFiltradas.length === 0" class="text-center py-8 text-neutral-400 text-xs italic">
+                            No se encontraron productos que coincidan con la búsqueda.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
 @push('scripts')
+@php
+    $variantesJson = \App\Models\ProductoVariante::with('producto')->where('activo', true)->get()->map(function($v) {
+        return [
+            'id' => $v->id,
+            'sku' => $v->sku,
+            'nombre_completo' => $v->nombre_completo,
+            'precio' => (float)$v->precio,
+            'imagen' => $v->imagen ?: ($v->producto->imagen ?? null),
+        ];
+    });
+@endphp
 <script>
     const plantillasConfig = @json($plantillas);
 </script>
@@ -851,6 +937,7 @@
             variantesExtras: @json(\App\Models\ProductoVariante::with('producto.extras')->where('activo', true)->get()->mapWithKeys(function($v) {
                 return [$v->id => $v->producto->extras];
             })),
+            variantesList: @json($variantesJson),
             pedidoSeleccionado: null,
             modalDetalles: false,
             modalConfirmarWhatsapp: false,
@@ -868,6 +955,31 @@
             clienteSeleccionadoObj: null,
             creandoCliente: false,
             nuevoCliente: { nombre: '', telefono: '', email: '' },
+
+            // Modal de búsqueda de inventario (Tarea 3)
+            modalBusquedaInventario: false,
+            itemIndexBuscando: null,
+            busquedaInventario: '',
+
+            get variantesFiltradas() {
+                if (!this.busquedaInventario) return this.variantesList.slice(0, 10);
+                const term = this.busquedaInventario.toLowerCase().trim();
+                return this.variantesList.filter(v =>
+                    v.nombre_completo.toLowerCase().includes(term) ||
+                    v.sku.toLowerCase().includes(term)
+                ).slice(0, 20);
+            },
+
+            seleccionarVarianteDesdeBuscador(variante) {
+                if (this.itemIndexBuscando !== null && this.form.detalles[this.itemIndexBuscando]) {
+                    this.form.detalles[this.itemIndexBuscando].producto_variante_id = variante.id;
+                    this.form.detalles[this.itemIndexBuscando].precio_venta = parseFloat(variante.precio);
+                    this.cargarPrecio(this.itemIndexBuscando);
+                }
+                this.modalBusquedaInventario = false;
+                this.busquedaInventario = '';
+                this.itemIndexBuscando = null;
+            },
 
             get clientesFiltrados() {
                 if(!this.buscarClienteTerm) return this.clientesList.slice(0, 5);
@@ -1146,33 +1258,61 @@
                 const item = this.form.detalles[index];
                 item.extras = []; // Reiniciar extras al cambiar variante
                 if(item.tipo_producto === 'Inventario' && item.producto_variante_id) {
-                    setTimeout(() => {
-                        const select = document.querySelectorAll(`select[x-model="item.producto_variante_id"]`)[index];
-                        if(select && select.options[select.selectedIndex]) {
-                            const precio = select.options[select.selectedIndex].dataset.precio;
-                            if(precio) item.precio_venta = parseFloat(precio);
-                        }
-                    }, 50);
+                    const v = this.variantesList.find(x => x.id == item.producto_variante_id);
+                    if(v) {
+                        item.precio_venta = parseFloat(v.precio);
+                    }
                 }
             },
 
-            togglePedidoExtra(index, extra) {
+            agregarPedidoExtra(index, extra) {
                 const item = this.form.detalles[index];
                 if (!item.extras) {
                     item.extras = [];
                 }
-                const idx = item.extras.findIndex(e => e.id === extra.id);
-                if (idx > -1) {
-                    item.extras.splice(idx, 1);
+                const found = item.extras.find(e => e.id === extra.id);
+                if (found) {
+                    found.cantidad++;
                 } else {
-                    item.extras.push(extra);
+                    item.extras.push({
+                        id: extra.id,
+                        cantidad: 1,
+                        nombre: extra.nombre,
+                        precio: parseFloat(extra.precio),
+                        costo: parseFloat(extra.costo)
+                    });
                 }
-                
-                // Buscar select para precio base
-                const select = document.querySelectorAll(`select[x-model="item.producto_variante_id"]`)[index];
-                if(select && select.options[select.selectedIndex]) {
-                    const precioBase = parseFloat(select.options[select.selectedIndex].dataset.precio || 0);
-                    const extrasPrecio = item.extras.reduce((s, e) => s + parseFloat(e.precio), 0);
+                this.recalcularPrecioItem(index);
+            },
+
+            quitarPedidoExtra(index, extra) {
+                const item = this.form.detalles[index];
+                if (!item.extras) {
+                    item.extras = [];
+                }
+                const found = item.extras.find(e => e.id === extra.id);
+                if (found) {
+                    found.cantidad--;
+                    if (found.cantidad <= 0) {
+                        item.extras = item.extras.filter(e => e.id !== extra.id);
+                    }
+                }
+                this.recalcularPrecioItem(index);
+            },
+
+            obtenerCantidadPedidoExtra(index, extraId) {
+                const item = this.form.detalles[index];
+                if (!item || !item.extras) return 0;
+                const found = item.extras.find(e => e.id === extraId);
+                return found ? found.cantidad : 0;
+            },
+
+            recalcularPrecioItem(index) {
+                const item = this.form.detalles[index];
+                const v = this.variantesList.find(x => x.id == item.producto_variante_id);
+                if (v) {
+                    const precioBase = parseFloat(v.precio || 0);
+                    const extrasPrecio = (item.extras || []).reduce((s, e) => s + parseFloat(e.precio) * parseInt(e.cantidad), 0);
                     item.precio_venta = precioBase + extrasPrecio;
                 }
             },
@@ -1261,6 +1401,15 @@
                     formData.append(`detalles[${i}][precio_venta]`, det.precio_venta);
                     if(det.tipo_producto === 'Inventario') {
                         formData.append(`detalles[${i}][producto_variante_id]`, det.producto_variante_id);
+                        if (det.extras && det.extras.length > 0) {
+                            det.extras.forEach((ex, j) => {
+                                formData.append(`detalles[${i}][extras][${j}][id]`, ex.id);
+                                formData.append(`detalles[${i}][extras][${j}][nombre]`, ex.nombre);
+                                formData.append(`detalles[${i}][extras][${j}][precio]`, ex.precio);
+                                formData.append(`detalles[${i}][extras][${j}][costo]`, ex.costo);
+                                formData.append(`detalles[${i}][extras][${j}][cantidad]`, ex.cantidad || 1);
+                            });
+                        }
                     } else {
                         formData.append(`detalles[${i}][nombre_libre]`, det.nombre_libre);
                         formData.append(`detalles[${i}][descripcion_libre]`, det.descripcion_libre || '');
