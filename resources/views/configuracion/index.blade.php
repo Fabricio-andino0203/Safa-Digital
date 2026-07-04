@@ -51,6 +51,10 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             Usuarios y Permisos
         </button>
+        <button @click="tab = 'mantenimiento'" :class="tab === 'mantenimiento' ? 'border-neutral-900 text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'" class="px-5 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            Mantenimiento
+        </button>
     </div>
 
     <!-- Pestaña: Empresa -->
@@ -248,6 +252,39 @@
         </div>
     </div>
 
+    <!-- Pestaña: Mantenimiento -->
+    <div x-show="tab === 'mantenimiento'" x-cloak class="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden p-6 md:p-8 space-y-6">
+        <div>
+            <h3 class="text-lg font-bold text-neutral-900">Mantenimiento del Sistema</h3>
+            <p class="text-sm text-neutral-500 mt-1">Herramientas avanzadas para la administración de la base de datos y restablecimiento de estado.</p>
+        </div>
+
+        <div class="border border-red-100 bg-red-50/50 rounded-2xl p-6 space-y-4">
+            <div class="flex items-start gap-4">
+                <div class="p-3 bg-red-100 text-red-700 rounded-xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <div class="space-y-1">
+                    <h4 class="text-sm font-bold text-red-900">Restablecer Datos Transaccionales</h4>
+                    <p class="text-xs text-red-800/80 leading-normal">
+                        Esta acción vaciará por completo el historial de ventas POS, sesiones de caja, movimientos de tesorería, cotizaciones, compras, historial y detalles de pedidos, y restablecerá el stock físico y reservado del inventario a cero (0).
+                    </p>
+                    <p class="text-xs font-bold text-red-800 leading-normal mt-2">
+                        🛡️ Protección Estricta: Las tablas maestras de Productos, Clientes, Usuarios, Configuración y Mensajería están protegidas y NO serán alteradas.
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-4 flex justify-end">
+                <button @click="$dispatch('abrir-confirmacion-reset')" 
+                        class="px-5 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    Restablecer Datos Transaccionales
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Crear/Editar Usuario -->
     <div x-show="modalUsuario" class="relative z-50" x-cloak>
         <div x-show="modalUsuario" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
@@ -341,6 +378,53 @@
                         </div>
                     </form>
 
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmación de Restablecimiento de Datos -->
+    <div x-data="{ openConfirm: false }"
+         x-on:abrir-confirmacion-reset.window="openConfirm = true"
+         x-show="openConfirm" 
+         class="relative z-50" 
+         x-cloak>
+        <div x-show="openConfirm" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div x-show="openConfirm"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     @click.away="openConfirm = false"
+                     class="relative w-full max-w-md transform overflow-hidden rounded-3xl bg-white shadow-2xl p-7 border border-neutral-100 space-y-5">
+                    
+                    <div class="flex items-center gap-3 border-b border-neutral-100 pb-3">
+                        <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-neutral-900">¿Confirmar Restablecimiento?</h3>
+                    </div>
+
+                    <div class="space-y-3">
+                        <p class="text-xs text-neutral-600 leading-relaxed">
+                            Esta acción es **irreversible** y eliminará de forma permanente todo el historial operativo de ventas, facturas, caja, egresos, cotizaciones y pedidos.
+                        </p>
+                        <p class="text-xs text-red-600 font-bold leading-relaxed bg-red-50 p-3 rounded-xl border border-red-100">
+                            ⚠️ Los datos maestros (Productos, Clientes, Usuarios y Ajustes) están protegidos. El inventario permanecerá pero con cantidades en cero.
+                        </p>
+                    </div>
+
+                    <form action="{{ route('configuracion.limpiarTransacciones') }}" method="POST" class="pt-4 flex justify-end gap-3 border-t border-neutral-100">
+                        @csrf
+                        <button type="button" @click="openConfirm = false" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-colors shadow-sm">
+                            Sí, Borrar Historial
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

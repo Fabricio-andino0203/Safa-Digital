@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/empresa', [\App\Http\Controllers\ConfiguracionController::class, 'updateEmpresa'])->name('update.empresa');
         Route::post('/tickets', [\App\Http\Controllers\ConfiguracionController::class, 'updateTickets'])->name('update.tickets');
         Route::post('/whatsapp', [\App\Http\Controllers\ConfiguracionController::class, 'updateWhatsapp'])->name('update.whatsapp');
+        Route::post('/limpiar-transacciones', [\App\Http\Controllers\ConfiguracionController::class, 'limpiarTransacciones'])->name('limpiarTransacciones');
         
         // CRUD Usuarios
         Route::post('/usuarios', [\App\Http\Controllers\UsuarioController::class, 'store'])->name('usuarios.store');

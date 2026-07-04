@@ -133,6 +133,87 @@ class ConfiguracionController extends Controller
         }
     }
 
+    public function limpiarTransacciones(Request $request)
+    {
+        if (auth()->check() && !auth()->user()->tienePermiso('configuracion')) {
+            abort(403, 'No autorizado.');
+        }
+
+        DB::beginTransaction();
+        try {
+            if (DB::getDriverName() === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys = OFF;');
+            } else {
+                DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
+            }
+
+            // Tablas transaccionales permitidas para ser vaciadas
+            $tablas = [
+                'venta_pos_detalles',
+                'ventas_pos',
+                'caja_movimientos',
+                'caja_sesiones',
+                'cortes_caja',
+                'pedido_historiales',
+                'pedido_archivos',
+                'pedido_detalles',
+                'pedidos',
+                'cotizacion_detalles',
+                'cotizaciones',
+                'compra_detalles',
+                'compras',
+                'movimiento_tesorerias',
+                'ajustes_stock',
+                'notifications',
+                'gastos'
+            ];
+
+            foreach ($tablas as $tabla) {
+                if (\Schema::hasTable($tabla)) {
+                    DB::table($tabla)->truncate();
+                }
+            }
+
+            // REGLA DE MODIFICACIÓN: Para el inventario, establecer stock en cero sin borrar productos ni variantes
+            if (\Schema::hasTable('producto_variantes')) {
+                DB::table('producto_variantes')->update([
+                    'stock_fisico' => 0,
+                    'stock_reservado' => 0
+                ]);
+            }
+            if (\Schema::hasColumn('productos', 'stock')) {
+                DB::table('productos')->update(['stock' => 0]);
+            }
+
+            // Restablecer saldo de cuentas financieras centralizadas
+            if (\Schema::hasTable('cuenta_financieras')) {
+                DB::table('cuenta_financieras')->update(['saldo_actual' => 0.00]);
+            }
+
+            if (DB::getDriverName() === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys = ON;');
+            } else {
+                DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+            }
+
+            DB::commit();
+
+            return redirect()->route('configuracion.index')->with('success', 'El historial transaccional ha sido borrado y los niveles de stock se han restablecido a cero exitosamente. Los datos maestros han sido protegidos.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            try {
+                if (DB::getDriverName() === 'sqlite') {
+                    DB::statement('PRAGMA foreign_keys = ON;');
+                } else {
+                    DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+                }
+            } catch (\Exception $ex) {}
+
+            return back()->with('error', 'Error al restablecer los datos transaccionales: ' . $e->getMessage());
+        }
+    }
+
     private function saveSetting($grupo, $llave, $valor, $tipo)
     {
         Configuracion::updateOrCreate(
