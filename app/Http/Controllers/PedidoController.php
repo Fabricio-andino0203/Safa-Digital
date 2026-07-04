@@ -295,49 +295,35 @@ class PedidoController extends Controller
     public function descargarTicket($id)
     {
         ini_set('memory_limit', '512M');
+        $pedido = Pedido::with(['cliente', 'detalles.variante.producto'])->findOrFail($id);
+        
         try {
-            $pedido = Pedido::with(['cliente', 'detalles.variante.producto'])->findOrFail($id);
-            
-            try {
-                $qrCode = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(0)->generate(route('pedidos.track', $pedido->numero_orden)));
-            } catch (\Exception $e) {
-                $qrCode = null;
-            }
-            
-            return response()->streamDownload(function () use ($pedido, $qrCode) {
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.ticket_80mm', compact('pedido', 'qrCode'));
-                $pdf->setPaper([0, 0, 226.77, 800], 'portrait');
-                echo $pdf->output();
-            }, 'ticket_'.$pedido->numero_orden.'.pdf');
-            
+            $qrCode = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(0)->generate(route('pedidos.track', $pedido->numero_orden)));
         } catch (\Exception $e) {
-            \Log::error('Error PDF Ticket: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-            return response()->json(['success' => false, 'message' => 'Error al generar PDF: ' . $e->getMessage()], 500);
+            $qrCode = null;
         }
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.ticket_80mm', compact('pedido', 'qrCode'));
+        $pdf->setPaper([0, 0, 226.77, 800], 'portrait');
+
+        return $pdf->stream('ticket_'.$pedido->numero_orden.'.pdf');
     }
 
     public function descargarA4($id)
     {
         ini_set('memory_limit', '512M');
+        $pedido = Pedido::with(['cliente', 'detalles.variante.producto'])->findOrFail($id);
+        
         try {
-            $pedido = Pedido::with(['cliente', 'detalles.variante.producto'])->findOrFail($id);
-            
-            try {
-                $qrCode = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(100)->margin(0)->generate(route('pedidos.track', $pedido->numero_orden)));
-            } catch (\Exception $e) {
-                $qrCode = null;
-            }
-            
-            return response()->streamDownload(function () use ($pedido, $qrCode) {
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.orden_a4', compact('pedido', 'qrCode'));
-                $pdf->setPaper('a4', 'portrait');
-                echo $pdf->output();
-            }, 'orden_'.$pedido->numero_orden.'.pdf');
-            
+            $qrCode = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(100)->margin(0)->generate(route('pedidos.track', $pedido->numero_orden)));
         } catch (\Exception $e) {
-            \Log::error('Error PDF A4: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-            return response()->json(['success' => false, 'message' => 'Error al generar PDF: ' . $e->getMessage()], 500);
+            $qrCode = null;
         }
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.orden_a4', compact('pedido', 'qrCode'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream('orden_'.$pedido->numero_orden.'.pdf');
     }
 
     public function cancelar(Request $request, $id)
