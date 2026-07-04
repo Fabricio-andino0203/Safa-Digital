@@ -53,6 +53,7 @@ class CotizacionController extends Controller
             'detalles.*.costo_libre' => 'required_if:detalles.*.tipo_producto,Libre|nullable|numeric|min:0',
             'detalles.*.precio_venta' => 'required|numeric|min:0',
             'detalles.*.cantidad' => 'required|integer|min:1',
+            'detalles.*.extras' => 'nullable|array',
         ]);
 
         try {
@@ -80,6 +81,7 @@ class CotizacionController extends Controller
                     'precio_venta' => $det['precio_venta'],
                     'cantidad' => $det['cantidad'],
                     'subtotal' => $lineSubtotal,
+                    'extras' => $det['extras'] ?? null,
                 ];
             }
 
@@ -167,9 +169,25 @@ class CotizacionController extends Controller
                             $variante->reservar($detalle->cantidad); // Incrementa stock_reservado
 
                             $detalleData['producto_variante_id'] = $variante->id;
-                            $detalleData['nombre_snapshot']      = $variante->nombre_completo;
+                            
+                            $nombreSnapshot = $variante->nombre_completo;
+                            if (!empty($detalle->extras)) {
+                                $partesExtras = [];
+                                foreach ($detalle->extras as $ex) {
+                                    $qty = intval($ex['cantidad'] ?? 1);
+                                    if ($qty > 1) {
+                                        $partesExtras[] = "{$qty}x {$ex['nombre']}";
+                                    } else {
+                                        $partesExtras[] = $ex['nombre'];
+                                    }
+                                }
+                                $nombreSnapshot .= ' (' . implode(', ', $partesExtras) . ')';
+                            }
+                            
+                            $detalleData['nombre_snapshot']      = $nombreSnapshot;
                             $detalleData['sku_snapshot']         = $variante->sku;
                             $detalleData['precio_unitario']      = $variante->precio;
+                            $detalleData['extras']               = $detalle->extras;
                         } else {
                             $detalleData['nombre_libre']      = $detalle->nombre_libre;
                             $detalleData['descripcion_libre'] = $detalle->descripcion_libre;

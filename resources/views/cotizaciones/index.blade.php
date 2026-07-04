@@ -3,7 +3,7 @@
 @section('header_title', 'Cotizaciones Comerciales')
 
 @section('content')
-<div x-data="cotizacionesApp()" class="h-full flex flex-col">
+<div x-data="cotizacionesApp()" @producto-seleccionado.window="seleccionarProductoDesdeBuscadorGlobal($event.detail)" class="h-full flex flex-col">
     <!-- Header de Controles -->
     <div class="flex justify-between items-center mb-6 flex-shrink-0">
         <div>
@@ -155,13 +155,28 @@
                                                  <!-- Inventario -->
                                                  <template x-if="item.tipo_producto === 'Inventario'">
                                                      <div>
-                                                         <label class="block text-xs font-semibold text-neutral-500 mb-1">Producto Variante *</label>
-                                                         <select x-model="item.producto_variante_id" @change="cargarPrecioInventario(index)" required class="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:outline-none bg-white">
-                                                             <option value="">Selecciona Variante...</option>
-                                                             <template x-for="v in variantesList" :key="v.id">
-                                                                 <option :value="v.id" x-text="v.sku + ' - ' + v.nombre_completo"></option>
-                                                             </template>
-                                                         </select>
+                                                         <label class="block text-xs font-semibold text-neutral-500 mb-1">Producto / Variante *</label>
+                                                          <button type="button" @click="$dispatch('abrir-buscador-global', { index: index })"
+                                                                  class="w-full text-left rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none bg-white hover:bg-neutral-50 transition-colors flex items-center justify-between">
+                                                              <span x-text="item.producto_variante_id ? (variantesList.find(v => v.id == item.producto_variante_id)?.sku + ' - ' + variantesList.find(v => v.id == item.producto_variante_id)?.nombre_completo) : '🔍 Buscar Producto en Inventario'"
+                                                                    :class="item.producto_variante_id ? 'text-neutral-900 font-bold' : 'text-neutral-400 font-semibold'"></span>
+                                                              <svg class="w-4 h-4 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                                                          </button>
+                                                          <input type="hidden" x-model="item.producto_variante_id" required />
+
+                                                          <!-- Contenedor de Extras Seleccionados en Cotizaciones -->
+                                                          <template x-if="item.producto_variante_id && item.extras && item.extras.length > 0">
+                                                              <div class="mt-2 space-y-1 bg-white border border-neutral-200/80 rounded-xl p-2.5">
+                                                                  <span class="text-[9px] font-bold text-neutral-400 uppercase tracking-wider block">Extras Seleccionados:</span>
+                                                                  <div class="flex flex-wrap gap-1.5 mt-1.5">
+                                                                      <template x-for="ex in item.extras" :key="ex.id">
+                                                                          <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-neutral-50 border border-neutral-200 rounded-lg text-[10px] font-semibold text-neutral-700 shadow-sm">
+                                                                              <span x-text="ex.cantidad + 'x ' + ex.nombre + ' (+L. ' + Number(ex.precio * ex.cantidad).toFixed(2) + ')'"></span>
+                                                                          </span>
+                                                                      </template>
+                                                                  </div>
+                                                              </div>
+                                                          </template>
                                                      </div>
                                                  </template>
                                                  <!-- Libre -->
@@ -460,7 +475,9 @@
                 </div>
             </div>
         </div>
-    </div>
+    <!-- Componente Global de Búsqueda de Inventario (Tarea 1) -->
+    <x-buscador-inventario-global />
+
 </div>
 @endsection
 
@@ -518,6 +535,16 @@
                 setTimeout(() => {
                     if (this.toastError === msg) this.toastError = '';
                 }, 5000);
+            },
+
+            seleccionarProductoDesdeBuscadorGlobal(detail) {
+                const index = detail.index;
+                if (this.form.detalles[index]) {
+                    this.form.detalles[index].producto_variante_id = detail.producto_variante_id;
+                    this.form.detalles[index].precio_venta = detail.precio_venta;
+                    this.form.detalles[index].costo_libre = detail.costo_unitario;
+                    this.form.detalles[index].extras = detail.extras;
+                }
             },
             
             // Listas inyectadas

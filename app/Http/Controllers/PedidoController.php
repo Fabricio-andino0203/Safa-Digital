@@ -23,6 +23,32 @@ class PedidoController extends Controller
     public function store(Request $request)
     {
         try {
+            // Detectar si el post_max_size de PHP fue superado (lo cual vacía el $request)
+            if ($request->isMethod('post') && empty($request->all()) && empty($_FILES) && $request->headers->get('content-length') > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El tamaño total de los archivos supera el límite permitido por el servidor (post_max_size).'
+                ], 422);
+            }
+
+            // Comprobar errores de subida de archivos antes de validar
+            if (isset($_FILES['archivos'])) {
+                foreach ($_FILES['archivos']['error'] as $index => $error) {
+                    if ($error === UPLOAD_ERR_INI_SIZE || $error === UPLOAD_ERR_FORM_SIZE) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'El archivo ' . ($_FILES['archivos']['name'][$index] ?? '') . ' excede el tamaño máximo permitido por el servidor.'
+                        ], 422);
+                    }
+                    if ($error !== UPLOAD_ERR_OK && $error !== UPLOAD_ERR_NO_FILE) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Error al subir el archivo ' . ($_FILES['archivos']['name'][$index] ?? '') . '.'
+                        ], 422);
+                    }
+                }
+            }
+
             $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
                 'cliente_id'             => 'nullable|exists:clientes,id',
                 'nuevo_cliente_nombre'   => 'required_without:cliente_id|nullable|string',
@@ -48,7 +74,7 @@ class PedidoController extends Controller
 
                 // Archivos adjuntos
                 'archivos'        => 'nullable|array',
-                'archivos.*'      => 'file|mimes:jpeg,png,jpg,pdf|max:10240',
+                'archivos.*'      => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:10240',
             ]);
 
             if ($validator->fails()) {
@@ -141,14 +167,24 @@ class PedidoController extends Controller
 
             // ── Archivos ───────────────────────────────────────────────────────
             if ($request->hasFile('archivos')) {
-                foreach ($request->file('archivos') as $file) {
-                    $ruta = \Illuminate\Support\Facades\Storage::disk(config('filesystems.default'))->putFile('pedidos/disenos', $file);
-                    PedidoArchivo::create([
-                        'pedido_id'       => $pedido->id,
-                        'ruta'            => $ruta,
-                        'nombre_original' => $file->getClientOriginalName(),
-                        'tipo'            => $file->extension(),
-                    ]);
+                try {
+                    foreach ($request->file('archivos') as $file) {
+                        if ($file->isValid()) {
+                            $ruta = \Illuminate\Support\Facades\Storage::disk(config('filesystems.default'))->putFile('pedidos/disenos', $file);
+                            PedidoArchivo::create([
+                                'pedido_id'       => $pedido->id,
+                                'ruta'            => $ruta,
+                                'nombre_original' => $file->getClientOriginalName(),
+                                'tipo'            => $file->extension(),
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Error al guardar los archivos adjuntos en el servidor: ' . $e->getMessage()
+                    ], 500);
                 }
             }
 
