@@ -69,7 +69,7 @@
                 <div>
                     <div class="text-lg font-bold text-neutral-900">{{ $pedido->estado }}</div>
                     @if($pedido->fecha_estimada_entrega)
-                    <div class="text-sm text-neutral-500 mt-0.5">Entrega: {{ $pedido->fecha_estimada_entrega->format('d/m/Y') }}</div>
+                    <div class="text-sm text-neutral-500 mt-0.5">Entrega: {{ \Carbon\Carbon::parse($pedido->fecha_estimada_entrega)->setTimezone('America/Tegucigalpa')->format('d/m/Y') }}</div>
                     @else
                     <div class="text-sm text-neutral-500 mt-0.5">Fecha de entrega pendiente</div>
                     @endif
@@ -97,7 +97,7 @@
                         <div class="flex flex-col">
                             <span class="text-sm font-bold text-neutral-800">{{ $historial->estado_nuevo }}</span>
                             <span class="text-xs text-neutral-400 mt-0.5">
-                                {{ $historial->created_at->timezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}
+                                {{ \Carbon\Carbon::parse($historial->created_at)->setTimezone('America/Tegucigalpa')->format('d/m/Y h:i A') }}
                             </span>
                         </div>
                     </div>
