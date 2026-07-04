@@ -28,20 +28,35 @@
     <div class="text-center">
         @php
             $rutaRelativa = get_setting('logo_ruta');
-            $realPath = str_replace('storage/', '', $rutaRelativa);
-            $rutaAbsoluta = storage_path('app/public/' . $realPath);
             $logoHtml = '';
             $razon_social = get_setting('razon_social');
             
-            if ($rutaRelativa && file_exists($rutaAbsoluta)) {
-                $ext = strtolower(pathinfo($rutaAbsoluta, PATHINFO_EXTENSION));
-                $data = file_get_contents($rutaAbsoluta);
-                $base64 = base64_encode($data);
+            if ($rutaRelativa) {
+                $realPath = ltrim(str_replace('storage/', '', $rutaRelativa), '/');
+                $candidatos = [
+                    public_path($rutaRelativa),
+                    public_path($realPath),
+                    storage_path('app/public/' . $realPath),
+                ];
                 
-                if ($ext === 'svg') {
-                    $logoHtml = '<img src="data:image/svg+xml;base64,' . $base64 . '" style="width: 220px; max-height: none; margin: 0 auto; display: block;">';
-                } else {
-                    $logoHtml = '<img src="data:image/' . $ext . ';base64,' . $base64 . '" style="width: 220px; max-height: none; margin: 0 auto; display: block;">';
+                $rutaAbsoluta = null;
+                foreach ($candidatos as $cand) {
+                    if (file_exists($cand) && is_file($cand)) {
+                        $rutaAbsoluta = $cand;
+                        break;
+                    }
+                }
+                
+                if ($rutaAbsoluta) {
+                    $ext = strtolower(pathinfo($rutaAbsoluta, PATHINFO_EXTENSION));
+                    $data = file_get_contents($rutaAbsoluta);
+                    $base64 = base64_encode($data);
+                    
+                    if ($ext === 'svg') {
+                        $logoHtml = '<img src="data:image/svg+xml;base64,' . $base64 . '" style="width: 220px; max-height: none; margin: 0 auto; display: block;">';
+                    } else {
+                        $logoHtml = '<img src="data:image/' . $ext . ';base64,' . $base64 . '" style="width: 220px; max-height: none; margin: 0 auto; display: block;">';
+                    }
                 }
             }
         @endphp
@@ -112,11 +127,10 @@
             @foreach($pedido->detalles as $detalle)
             <tr style="border-bottom: 1px solid #000;">
                 <td style="padding: 5px 0; font-size: 9px; vertical-align: top;">
-                    @if($detalle->tipo_producto === 'Inventario' && $detalle->variante)
-                        <div style="font-weight: bold;">{{ $detalle->variante->producto->nombre }}</div>
-                        <div style="font-size: 8px;">{{ $detalle->variante->talla }} / {{ $detalle->variante->color }}</div>
-                    @else
-                        <div style="font-weight: bold;">{{ $detalle->nombre_libre }}</div>
+                    <div style="font-weight: bold;">
+                        {{ $detalle->tipo_producto === 'Inventario' ? ($detalle->nombre_snapshot ?? ($detalle->variante->producto->nombre ?? 'Producto')) : $detalle->nombre_libre }}
+                    </div>
+                    @if($detalle->tipo_producto === 'Libre' && $detalle->descripcion_libre)
                         <div style="font-size: 8px;">{{ $detalle->descripcion_libre }}</div>
                     @endif
                 </td>

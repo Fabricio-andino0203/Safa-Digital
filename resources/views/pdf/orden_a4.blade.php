@@ -22,19 +22,34 @@
 
     @php
         $rutaRelativa = get_setting('logo_ruta');
-        $realPath = str_replace('storage/', '', $rutaRelativa);
-        $rutaAbsoluta = storage_path('app/public/' . $realPath);
         $logoHtml = '';
         
-        if ($rutaRelativa && file_exists($rutaAbsoluta)) {
-            $ext = strtolower(pathinfo($rutaAbsoluta, PATHINFO_EXTENSION));
-            $data = file_get_contents($rutaAbsoluta);
-            $base64 = base64_encode($data);
+        if ($rutaRelativa) {
+            $realPath = ltrim(str_replace('storage/', '', $rutaRelativa), '/');
+            $candidatos = [
+                public_path($rutaRelativa),
+                public_path($realPath),
+                storage_path('app/public/' . $realPath),
+            ];
             
-            if ($ext === 'svg') {
-                $logoHtml = '<img src="data:image/svg+xml;base64,' . $base64 . '" style="width: 150px; max-height: none; margin: 0; display: block;">';
-            } else {
-                $logoHtml = '<img src="data:image/' . $ext . ';base64,' . $base64 . '" style="width: 150px; max-height: none; margin: 0; display: block;">';
+            $rutaAbsoluta = null;
+            foreach ($candidatos as $cand) {
+                if (file_exists($cand) && is_file($cand)) {
+                    $rutaAbsoluta = $cand;
+                    break;
+                }
+            }
+            
+            if ($rutaAbsoluta) {
+                $ext = strtolower(pathinfo($rutaAbsoluta, PATHINFO_EXTENSION));
+                $data = file_get_contents($rutaAbsoluta);
+                $base64 = base64_encode($data);
+                
+                if ($ext === 'svg') {
+                    $logoHtml = '<img src="data:image/svg+xml;base64,' . $base64 . '" style="width: 150px; max-height: none; margin: 0; display: block;">';
+                } else {
+                    $logoHtml = '<img src="data:image/' . $ext . ';base64,' . $base64 . '" style="width: 150px; max-height: none; margin: 0; display: block;">';
+                }
             }
         }
     @endphp
@@ -112,11 +127,10 @@
                     {{ $detalle->cantidad }}
                 </td>
                 <td style="padding: 8px 10px; font-size: 10px; vertical-align: top;">
-                    @if($detalle->tipo_producto === 'Inventario' && $detalle->variante)
-                        <div style="font-weight: bold; color: #111827;">{{ $detalle->variante->producto->nombre }}</div>
-                        <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">{{ $detalle->variante->talla }} / {{ $detalle->variante->color }}</div>
-                    @else
-                        <div style="font-weight: bold; color: #111827;">{{ $detalle->nombre_libre }}</div>
+                    <div style="font-weight: bold; color: #111827;">
+                        {{ $detalle->tipo_producto === 'Inventario' ? ($detalle->nombre_snapshot ?? ($detalle->variante->producto->nombre ?? 'Producto')) : $detalle->nombre_libre }}
+                    </div>
+                    @if($detalle->tipo_producto === 'Libre' && $detalle->descripcion_libre)
                         <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">{{ $detalle->descripcion_libre }}</div>
                     @endif
                 </td>

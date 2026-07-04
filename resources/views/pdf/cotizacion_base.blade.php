@@ -43,14 +43,30 @@
 
 @php
     $rutaRelativa = get_setting('logo_ruta');
-    $rutaAbsoluta = storage_path('app/public/' . str_replace('storage/', '', $rutaRelativa));
     $logoHtml = '';
-    if ($rutaRelativa && file_exists($rutaAbsoluta)) {
-        $ext = strtolower(pathinfo($rutaAbsoluta, PATHINFO_EXTENSION));
-        $data = file_get_contents($rutaAbsoluta);
-        $base64 = base64_encode($data);
-        $mime = ($ext === 'svg') ? 'image/svg+xml' : 'image/' . $ext;
-        $logoHtml = '<img src="data:' . $mime . ';base64,' . $base64 . '" style="width: 200px; max-height: none; display: block;">';
+    if ($rutaRelativa) {
+        $realPath = ltrim(str_replace('storage/', '', $rutaRelativa), '/');
+        $candidatos = [
+            public_path($rutaRelativa),
+            public_path($realPath),
+            storage_path('app/public/' . $realPath),
+        ];
+        
+        $rutaAbsoluta = null;
+        foreach ($candidatos as $cand) {
+            if (file_exists($cand) && is_file($cand)) {
+                $rutaAbsoluta = $cand;
+                break;
+            }
+        }
+        
+        if ($rutaAbsoluta) {
+            $ext = strtolower(pathinfo($rutaAbsoluta, PATHINFO_EXTENSION));
+            $data = file_get_contents($rutaAbsoluta);
+            $base64 = base64_encode($data);
+            $mime = ($ext === 'svg') ? 'image/svg+xml' : 'image/' . $ext;
+            $logoHtml = '<img src="data:' . $mime . ';base64,' . $base64 . '" style="width: 200px; max-height: none; display: block;">';
+        }
     }
 @endphp
 
@@ -119,10 +135,23 @@
                 <td class="text-center font-bold" style="color: #111827;">{{ $detalle->cantidad }}</td>
                 <td>
                     @if($detalle->tipo_producto === 'Inventario' && $detalle->variante)
-                        <strong style="color: #111827;">{{ $detalle->variante->producto->nombre }}</strong>
-                        <span style="font-size: 9px; color: #6b7280; display: block; margin-top: 2px;">SKU: {{ $detalle->variante->sku }} &bull; {{ $detalle->variante->nombre_completo }}</span>
+                        <strong style="color: #111827;">{{ $detalle->variante->producto->nombre ?? 'Producto' }}</strong>
+                        <span style="font-size: 9px; color: #6b7280; display: block; margin-top: 2px;">
+                            SKU: {{ $detalle->variante->sku }} &bull; {{ $detalle->variante->nombre_completo }}
+                            @if(!empty($detalle->extras))
+                                &bull; Extras: 
+                                @php
+                                    $partes = [];
+                                    foreach ($detalle->extras as $ex) {
+                                        $qty = intval($ex['cantidad'] ?? 1);
+                                        $partes[] = $qty > 1 ? "{$qty}x {$ex['nombre']}" : $ex['nombre'];
+                                    }
+                                @endphp
+                                {{ implode(', ', $partes) }}
+                            @endif
+                        </span>
                     @else
-                        <strong style="color: #111827;">{{ $detalle->nombre_libre }}</strong>
+                        <strong style="color: #111827;">{{ $detalle->nombre_libre ?? 'Ítem Libre' }}</strong>
                         @if($detalle->descripcion_libre)
                             <span style="font-size: 9px; color: #6b7280; display: block; margin-top: 2px;">{{ $detalle->descripcion_libre }}</span>
                         @endif
