@@ -28,4 +28,10 @@ class Categoria extends Model
     {
         return $this->hasMany(Producto::class);
     }
+
+    /** Extras asociados a esta categoría */
+    public function extras()
+    {
+        return $this->belongsToMany(ProductoExtra::class, 'categoria_extra', 'categoria_id', 'extra_id');
+    }
 }

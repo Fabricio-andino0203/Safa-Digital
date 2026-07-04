@@ -360,11 +360,24 @@
                 <div class="flex items-center justify-between border-t border-neutral-100 pt-3">
                     <label class="block text-sm font-semibold text-neutral-700">Extras (DTF, Sublimación, etc.)</label>
                     <button type="button" @click="formProducto.extras.push({ nombre: '', costo: 0, precio: 0 })"
-                            class="px-2.5 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-lg hover:bg-neutral-800 transition-colors">
-                        + Agregar Extra
+                            class="px-2.5 py-1 bg-neutral-900 text-white text-[10px] font-bold rounded-lg hover:bg-neutral-800 transition-colors"
+                            x-text="obtenerExtrasHeredados().length > 0 ? '+ Agregar Extra Específico' : '+ Agregar Extra'">
                     </button>
                 </div>
                 
+                {{-- Reflejo visual de extras heredados por categoría (Tarea 2) --}}
+                <div x-show="obtenerExtrasHeredados().length > 0" class="p-3 bg-green-50/70 border border-green-100 rounded-xl space-y-1.5">
+                    <p class="text-[11px] font-bold text-green-800 flex items-center gap-1">
+                        <span>✅ Extras heredados automáticamente:</span>
+                    </p>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="ex in obtenerExtrasHeredados()" :key="ex.id">
+                            <span class="text-[10px] font-semibold bg-green-100 text-green-800 px-2 py-0.5 rounded-lg animate-pulse"
+                                  x-text="ex.nombre + ' (L. ' + Number(ex.precio).toFixed(2) + ')'"></span>
+                        </template>
+                    </div>
+                </div>
+
                 <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
                     <template x-for="(extra, index) in formProducto.extras" :key="index">
                         <div class="flex gap-2 items-center">
@@ -389,7 +402,7 @@
                             </button>
                         </div>
                     </template>
-                    <template x-if="!formProducto.extras || formProducto.extras.length === 0">
+                    <template x-if="(!formProducto.extras || formProducto.extras.length === 0) && obtenerExtrasHeredados().length === 0">
                         <p class="text-[11px] text-neutral-400 text-center italic py-2">Sin extras configurados.</p>
                     </template>
                 </div>
@@ -743,6 +756,12 @@ function inventarioApp() {
                 return '/' + cleanPath;
             }
             return '/storage/' + cleanPath;
+        },
+
+        obtenerExtrasHeredados() {
+            if (!this.formProducto.categoria_id) return [];
+            const cat = this.categorias.find(c => c.id == this.formProducto.categoria_id);
+            return cat ? (cat.extras || []) : [];
         },
 
         // ── Filtros ─────────────────────────────────────────────────────────

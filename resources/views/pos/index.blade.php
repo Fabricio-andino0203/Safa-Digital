@@ -792,16 +792,24 @@
                 <p class="text-xs text-neutral-500">Selecciona los extras que deseas agregar a este producto:</p>
                 <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
                     <template x-for="extra in (productoParaExtras?.extras || [])" :key="extra.id">
-                        <label class="flex items-center justify-between p-3 bg-neutral-50 hover:bg-neutral-100/75 rounded-xl cursor-pointer transition-colors border border-neutral-100">
-                            <div class="flex items-center gap-3">
-                                <input type="checkbox" 
-                                       :checked="extrasSeleccionados.some(e => e.id === extra.id)"
-                                       @change="if ($event.target.checked) { extrasSeleccionados.push(extra); } else { extrasSeleccionados = extrasSeleccionados.filter(e => e.id !== extra.id); }"
-                                       class="rounded text-neutral-900 focus:ring-neutral-900 border-neutral-300 w-4 h-4"/>
-                                <span class="text-xs font-semibold text-neutral-700" x-text="extra.nombre"></span>
+                        <div class="flex items-center justify-between p-3.5 bg-neutral-50 rounded-xl border border-neutral-100 transition-all hover:bg-neutral-100/40">
+                            <div>
+                                <span class="text-xs font-bold text-neutral-800 block" x-text="extra.nombre"></span>
+                                <span class="text-[10px] font-semibold text-neutral-400" x-text="'L. ' + Number(extra.precio).toFixed(2) + ' c/u'"></span>
                             </div>
-                            <span class="text-xs font-bold text-neutral-900" x-text="'+L. ' + Number(extra.precio).toFixed(2)"></span>
-                        </label>
+                            <div class="flex items-center gap-2 bg-white border border-neutral-200 rounded-lg p-1.5 shadow-sm">
+                                <button type="button" @click="quitarExtra(extra)"
+                                        class="w-6 h-6 flex items-center justify-center text-xs font-bold bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-md transition-colors select-none">
+                                    −
+                                </button>
+                                <input type="number" readonly :value="obtenerCantidadExtra(extra.id)"
+                                       class="w-8 text-center text-xs font-bold text-neutral-800 focus:outline-none border-none bg-transparent select-none"/>
+                                <button type="button" @click="agregarExtra(extra)"
+                                        class="w-6 h-6 flex items-center justify-center text-xs font-bold bg-neutral-900 hover:bg-neutral-800 text-white rounded-md transition-colors select-none">
+                                    +
+                                </button>
+                            </div>
+                        </div>
                     </template>
                 </div>
 
@@ -1099,20 +1107,24 @@ function posApp() {
 
         confirmarExtrasYAgregar() {
             const basePrecio = parseFloat(this.varianteParaExtras.precio);
-            const extrasPrecioTotal = this.extrasSeleccionados.reduce((s, e) => s + parseFloat(e.precio), 0);
+            const extrasPrecioTotal = this.extrasSeleccionados.reduce((s, e) => s + parseFloat(e.precio) * parseInt(e.cantidad), 0);
             const precioFinal = basePrecio + extrasPrecioTotal;
             
-            const extrasIds = this.extrasSeleccionados.map(e => e.id).sort().join('-');
+            const extrasIds = this.extrasSeleccionados.map(e => `${e.id}:${e.cantidad}`).sort().join('-');
             const cartLineKey = this.varianteParaExtras.id + (extrasIds ? '-' + extrasIds : '');
 
             const ex = this.carrito.find(i => i.cartLineKey === cartLineKey);
             if (ex) {
                 if (ex.qty < ex.stockDisponible) ex.qty++;
             } else {
+                const nombresFormatted = this.extrasSeleccionados.map(e => {
+                    return e.cantidad > 1 ? `${e.cantidad}x ${e.nombre}` : e.nombre;
+                }).join(', ');
+
                 this.carrito.push({
                     cartLineKey:    cartLineKey,
                     varianteId:     this.varianteParaExtras.id,
-                    nombre:         this.varianteParaExtras.nombre_completo + (this.extrasSeleccionados.length > 0 ? ' (' + this.extrasSeleccionados.map(e => e.nombre).join(', ') + ')' : ''),
+                    nombre:         this.varianteParaExtras.nombre_completo + (this.extrasSeleccionados.length > 0 ? ' (' + nombresFormatted + ')' : ''),
                     sku:            this.varianteParaExtras.sku,
                     precio:         precioFinal,
                     stockDisponible: this.varianteParaExtras.stock_disponible,
@@ -1128,6 +1140,36 @@ function posApp() {
 
         inc(i) { if (this.carrito[i].qty < this.carrito[i].stockDisponible) this.carrito[i].qty++; },
         dec(i) { this.carrito[i].qty <= 1 ? this.carrito.splice(i, 1) : this.carrito[i].qty--; },
+
+        agregarExtra(extra) {
+            const found = this.extrasSeleccionados.find(e => e.id === extra.id);
+            if (found) {
+                found.cantidad++;
+            } else {
+                this.extrasSeleccionados.push({
+                    id: extra.id,
+                    cantidad: 1,
+                    nombre: extra.nombre,
+                    precio: parseFloat(extra.precio),
+                    costo: parseFloat(extra.costo)
+                });
+            }
+        },
+
+        quitarExtra(extra) {
+            const found = this.extrasSeleccionados.find(e => e.id === extra.id);
+            if (found) {
+                found.cantidad--;
+                if (found.cantidad <= 0) {
+                    this.extrasSeleccionados = this.extrasSeleccionados.filter(e => e.id !== extra.id);
+                }
+            }
+        },
+
+        obtenerCantidadExtra(id) {
+            const found = this.extrasSeleccionados.find(e => e.id === id);
+            return found ? found.cantidad : 0;
+        },
 
         // ── Cobro ─────────────────────────────────────────────────────────────
         async cobrar() {

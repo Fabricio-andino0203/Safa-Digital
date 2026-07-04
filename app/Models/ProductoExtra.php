@@ -19,4 +19,9 @@ class ProductoExtra extends Model
     {
         return $this->belongsTo(Producto::class);
     }
+
+    public function categorias()
+    {
+        return $this->belongsToMany(Categoria::class, 'categoria_extra', 'extra_id', 'categoria_id');
+    }
 }

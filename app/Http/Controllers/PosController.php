@@ -31,7 +31,7 @@ class PosController extends Controller
 
         // Cargamos productos activos con variantes activas que tengan stock disponible.
         // Estructura para Alpine: array de productos, cada uno con sus variantes.
-        $productos = Producto::with(['categoria', 'extras', 'variantes' => function ($q) {
+        $productos = Producto::with(['extras', 'categoria.extras', 'variantes' => function ($q) {
             $q->where('activo', true)->orderBy('sku');
         }])
         ->where('activo', true)
@@ -41,12 +41,15 @@ class PosController extends Controller
         ->orderBy('nombre')
         ->get()
         ->map(function ($producto) {
+            // Unificación de consulta de extras directos y heredados (Tarea 2)
+            $extrasDisponibles = $producto->extras->merge($producto->categoria ? $producto->categoria->extras : collect())->unique('id')->values();
+
             return [
                 'id'       => $producto->id,
                 'nombre'   => $producto->nombre,
                 'categoria'=> $producto->categoria?->nombre ?? 'Sin categoría',
                 'imagen'   => $producto->imagen,
-                'extras'   => $producto->extras->map(function ($e) {
+                'extras'   => $extrasDisponibles->map(function ($e) {
                     return [
                         'id'     => $e->id,
                         'nombre' => $e->nombre,
@@ -229,13 +232,17 @@ class PosController extends Controller
                         $costoExtra = $extraRecord ? floatval($extraRecord->costo) : floatval($ex['costo'] ?? 0);
                         $precioExtra = $extraRecord ? floatval($extraRecord->precio) : floatval($ex['precio'] ?? 0);
 
-                        $extrasCost += $costoExtra;
-                        $extrasPrice += $precioExtra;
+                        // Obtener la cantidad seleccionada para el extra
+                        $cantidadExtra = max(1, intval($ex['cantidad'] ?? 1));
+
+                        $extrasCost += $costoExtra * $cantidadExtra;
+                        $extrasPrice += $precioExtra * $cantidadExtra;
                         $extrasSnap[] = [
-                            'id'     => $ex['id'] ?? null,
-                            'nombre' => $ex['nombre'],
-                            'costo'  => $costoExtra,
-                            'precio' => $precioExtra,
+                            'id'       => $ex['id'] ?? null,
+                            'nombre'   => $ex['nombre'],
+                            'costo'    => $costoExtra,
+                            'precio'   => $precioExtra,
+                            'cantidad' => $cantidadExtra,
                         ];
                     }
                 }
@@ -308,8 +315,16 @@ class PosController extends Controller
                 // Generar nombre de la variante concatenando los extras para visualización en ticket y reportes
                 $nombreSnapshot = $item['variante']->nombre_completo;
                 if (!empty($item['extras'])) {
-                    $nombresExtras = array_column($item['extras'], 'nombre');
-                    $nombreSnapshot .= ' (' . implode(', ', $nombresExtras) . ')';
+                    $partesExtras = [];
+                    foreach ($item['extras'] as $ex) {
+                        $qty = intval($ex['cantidad'] ?? 1);
+                        if ($qty > 1) {
+                            $partesExtras[] = "{$qty}x {$ex['nombre']}";
+                        } else {
+                            $partesExtras[] = $ex['nombre'];
+                        }
+                    }
+                    $nombreSnapshot .= ' (' . implode(', ', $partesExtras) . ')';
                 }
 
                 VentaPosDetalle::create([
@@ -864,5 +879,13 @@ class PosController extends Controller
                 'message' => $e->getMessage()
             ], 422);
         }
+    }
+
+    public function obtenerExtras($productoId)
+    {
+        $producto = Producto::with(['extras', 'categoria.extras'])->findOrFail($productoId);
+        $extrasDisponibles = $producto->extras->merge($producto->categoria ? $producto->categoria->extras : collect())->unique('id')->values();
+
+        return response()->json($extrasDisponibles);
     }
 }

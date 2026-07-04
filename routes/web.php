@@ -123,6 +123,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/sesion/cerrar',   [PosController::class, 'cerrarSesion'])->name('cerrarSesion');
         Route::post('/sesion/corte',    [PosController::class, 'cerrarCaja'])->name('cerrarCaja');
         Route::post('/sesion/retiro',   [PosController::class, 'registrarRetiro'])->name('sesion.retiro');
+        Route::get('/productos/{id}/extras', [PosController::class, 'obtenerExtras'])->name('productos.extras');
     });
 
     // ─── Cotizaciones ─────────────────────────────────────────────────────────────
