@@ -749,7 +749,7 @@
             },
 
             badgeClass(estado) {
-                return match = {
+                return {
                     'Borrador': 'bg-neutral-50 text-neutral-600 border-neutral-200',
                     'Enviada': 'bg-blue-50 text-blue-700 border-blue-100',
                     'Aceptada': 'bg-green-50 text-green-700 border-green-100',
