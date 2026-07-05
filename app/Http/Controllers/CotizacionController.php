@@ -68,6 +68,7 @@ class CotizacionController extends Controller
             $subtotal = 0;
             $detallesValidos = [];
 
+            // Receptor/Listener: realiza el cálculo de costo silencioso en backend para seguridad financiera
             foreach ($request->detalles as $det) {
                 $lineSubtotal = $det['precio_venta'] * $det['cantidad'];
                 $subtotal += $lineSubtotal;
