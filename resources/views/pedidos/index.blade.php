@@ -1375,7 +1375,7 @@
                 let mensaje = plantilla.contenido;
 
                 // Construcción del enlace de seguimiento público
-                const linkSeguimiento = window.location.origin + '/pedidos/' + pedido.id + '/seguimiento';
+                const linkSeguimiento = window.location.origin + '/pedidos/track/' + pedido.numero_orden;
 
                 // Reemplazo completo de variables dinámicas
                 mensaje = mensaje.replace(/\{cliente\}/g,        pedido.cliente.nombre || '');

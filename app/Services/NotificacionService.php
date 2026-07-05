@@ -41,6 +41,7 @@ class NotificacionService
             '{abonado}'       => number_format($pedido->total_abonado, 2),
             '{saldo}'         => number_format($pedido->saldo_pendiente, 2),
             '{empresa}'       => 'Inversiones Solucels',
+            '{link}'          => route('pedidos.track', $pedido->numero_orden),
         ];
 
         return str_replace(array_keys($reemplazos), array_values($reemplazos), $texto);

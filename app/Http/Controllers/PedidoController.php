@@ -220,6 +220,7 @@ class PedidoController extends Controller
                 $mensaje = str_replace('{abonado}', number_format($pedido->total_abonado, 2), $mensaje);
                 $mensaje = str_replace('{saldo}', number_format($pedido->saldo_pendiente, 2), $mensaje);
                 $mensaje = str_replace('{empresa}', get_setting('nombre_comercial', 'Safa Digital'), $mensaje);
+                $mensaje = str_replace('{link}', route('pedidos.track', $pedido->numero_orden), $mensaje);
 
                 $telefono = preg_replace('/[^0-9]/', '', $pedido->cliente->telefono);
                 $whatsapp_url = "https://wa.me/{$telefono}?text=" . urlencode($mensaje);
