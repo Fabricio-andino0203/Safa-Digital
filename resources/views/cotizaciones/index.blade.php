@@ -485,7 +485,9 @@
                 </div>
             </div>
         </div>
-    <!-- Componente Global de Búsqueda de Inventario (Tarea 1) -->
+    </div>
+
+    <!-- Componente Global de Búsqueda de Inventario -->
     <x-buscador-inventario-global />
 
 </div>
