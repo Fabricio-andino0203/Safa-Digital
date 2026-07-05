@@ -1344,29 +1344,48 @@
                     alert("El cliente no tiene un teléfono registrado.");
                     return;
                 }
-                
-                // Buscar la plantilla que coincida con el evento de estado actual, si no, buscar "Pedido Creado" por defecto
-                let plantilla = plantillasConfig.find(p => p.evento === pedido.estado);
-                if(!plantilla) {
-                    // Fallback
-                    plantilla = plantillasConfig.find(p => p.evento === 'Pedido Creado');
+
+                // Mapa explícito de estado del pedido → evento de la plantilla en BD
+                const ESTADO_A_EVENTO = {
+                    'Pendiente'            : 'Pedido Creado',
+                    'Diseño'               : 'Diseño Terminado',
+                    'Esperando Aprobación' : 'Esperando Material del Cliente',
+                    'Producción'           : 'Producción Iniciada',
+                    'Listo para Entrega'   : 'Pedido Listo para Entrega',
+                    'Entregado'            : 'Pedido Listo para Entrega',
+                    'Pausado'              : 'Pedido Creado',
+                    'Cancelado'            : 'Pedido Creado',
+                };
+
+                const eventoObjetivo = ESTADO_A_EVENTO[pedido.estado] || 'Pedido Creado';
+
+                // Buscar plantilla activa para el evento correspondiente
+                let plantilla = plantillasConfig.find(p => p.evento === eventoObjetivo && p.activa);
+
+                // Fallback: cualquier plantilla de "Pedido Creado" activa
+                if (!plantilla) {
+                    plantilla = plantillasConfig.find(p => p.evento === 'Pedido Creado' && p.activa);
                 }
 
-                if(!plantilla) {
-                    alert("No hay plantilla configurada para este estado ni una por defecto activa.");
+                if (!plantilla) {
+                    alert("No hay plantilla configurada para el estado \"" + pedido.estado + "\" ni una plantilla por defecto activa.");
                     return;
                 }
 
                 let mensaje = plantilla.contenido;
-                
-                // Reemplazar variables dinámicas
-                mensaje = mensaje.replace(/{cliente}/g, pedido.cliente.nombre);
-                mensaje = mensaje.replace(/{orden}/g, pedido.numero_orden);
-                mensaje = mensaje.replace(/{fecha_entrega}/g, pedido.fecha_estimada_entrega ? pedido.fecha_estimada_entrega.substring(0,10) : 'Pendiente');
-                mensaje = mensaje.replace(/{total}/g, Number(pedido.total_pedido).toFixed(2));
-                mensaje = mensaje.replace(/{abonado}/g, Number(pedido.total_abonado).toFixed(2));
-                mensaje = mensaje.replace(/{saldo}/g, Number(pedido.saldo_pendiente).toFixed(2));
-                mensaje = mensaje.replace(/{empresa}/g, 'SAFA DIGITAL');
+
+                // Construcción del enlace de seguimiento público
+                const linkSeguimiento = window.location.origin + '/pedidos/' + pedido.id + '/seguimiento';
+
+                // Reemplazo completo de variables dinámicas
+                mensaje = mensaje.replace(/\{cliente\}/g,        pedido.cliente.nombre || '');
+                mensaje = mensaje.replace(/\{orden\}/g,          pedido.numero_orden   || '');
+                mensaje = mensaje.replace(/\{fecha_entrega\}/g,  pedido.fecha_estimada_entrega ? pedido.fecha_estimada_entrega.substring(0, 10) : 'Por definir');
+                mensaje = mensaje.replace(/\{total\}/g,          'L. ' + Number(pedido.total_pedido).toFixed(2));
+                mensaje = mensaje.replace(/\{abonado\}/g,        'L. ' + Number(pedido.total_abonado).toFixed(2));
+                mensaje = mensaje.replace(/\{saldo\}/g,          'L. ' + Number(pedido.saldo_pendiente).toFixed(2));
+                mensaje = mensaje.replace(/\{empresa\}/g,        'SAFA DIGITAL');
+                mensaje = mensaje.replace(/\{link\}/g,           linkSeguimiento);
 
                 const telefono = pedido.cliente.telefono.replace(/[^0-9]/g, '');
                 window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`, '_blank');
