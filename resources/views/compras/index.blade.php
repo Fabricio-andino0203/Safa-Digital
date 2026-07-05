@@ -9,6 +9,7 @@
     modalValorar: false,
     modalEditarCompra: false,
     buscadorProducto: '',
+    contextoCompra: 'nueva',
     proveedores: @js($proveedores),
     variantes: @js($variantes),
     compraForm: {
@@ -41,7 +42,21 @@
             detalles: []
         };
         this.buscadorProducto = '';
+        this.contextoCompra = 'nueva';
         this.modalNuevaCompra = true;
+    },
+
+    seleccionarProductoParaCompra(detail) {
+        const variante = {
+            id: detail.producto_variante_id,
+            sku: detail.sku || '',
+            nombre_completo: detail.nombre_completo || ''
+        };
+        if (this.contextoCompra === 'editar') {
+            this.agregarDetalleEditar(variante);
+        } else {
+            this.agregarDetalle(variante);
+        }
     },
     
     agregarDetalle(variante) {
@@ -154,9 +169,10 @@
             })
         };
         this.buscadorProducto = '';
+        this.contextoCompra = 'editar';
         this.modalEditarCompra = true;
     }
-}" class="max-w-6xl mx-auto space-y-6">
+}" @producto-seleccionado.window="seleccionarProductoParaCompra($event.detail)" class="max-w-6xl mx-auto space-y-6">
 
     @if(session('success'))
         <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl shadow-sm text-sm font-medium">
@@ -317,21 +333,13 @@
                         </div>
 
                         <!-- Buscador de Productos -->
-                        <div class="relative">
-                            <label class="block text-xs font-bold text-neutral-700 mb-2">Buscar Producto / Variante para Agregar</label>
-                            <input type="text" x-model="buscadorProducto" placeholder="Escribe SKU o nombre de variante..."
-                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900">
-                            
-                            <div x-show="variantesFiltradas.length > 0" class="absolute z-10 w-full bg-white border border-neutral-200 rounded-xl shadow-xl mt-1 overflow-hidden" x-cloak>
-                                <template x-for="v in variantesFiltradas" :key="v.id">
-                                    <div @click="agregarDetalle(v)" class="px-4 py-3 hover:bg-neutral-50 cursor-pointer flex justify-between items-center transition-colors">
-                                        <div>
-                                            <span class="font-bold text-neutral-900 block" x-text="v.nombre_completo"></span>
-                                            <span class="text-xs text-neutral-500 font-mono" x-text="'SKU: ' + v.sku"></span>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
+                        <div>
+                            <label class="block text-xs font-bold text-neutral-700 mb-2">Agregar Producto / Variante</label>
+                            <button type="button" @click="contextoCompra = 'nueva'; $dispatch('abrir-buscador-global', { index: compraForm.detalles.length })"
+                                    class="w-full text-left rounded-xl border border-neutral-200 px-3 py-2.5 text-sm focus:outline-none bg-white hover:bg-neutral-50 transition-colors flex items-center justify-between">
+                                <span class="text-neutral-400 font-semibold">🔍 Buscar Producto en Inventario</span>
+                                <svg class="w-4 h-4 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                            </button>
                         </div>
 
                         <!-- Detalles Agregados -->
@@ -443,21 +451,13 @@
                         </div>
 
                         <!-- Buscador de Productos -->
-                        <div class="relative">
-                            <label class="block text-xs font-bold text-neutral-700 mb-2">Buscar Producto / Variante para Agregar</label>
-                            <input type="text" x-model="buscadorProducto" placeholder="Escribe SKU o nombre de variante..."
-                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900">
-                            
-                            <div x-show="variantesFiltradas.length > 0" class="absolute z-10 w-full bg-white border border-neutral-200 rounded-xl shadow-xl mt-1 overflow-hidden" x-cloak>
-                                <template x-for="v in variantesFiltradas" :key="v.id">
-                                    <div @click="agregarDetalleEditar(v)" class="px-4 py-3 hover:bg-neutral-50 cursor-pointer flex justify-between items-center transition-colors">
-                                        <div>
-                                            <span class="font-bold text-neutral-900 block" x-text="v.nombre_completo"></span>
-                                            <span class="text-xs text-neutral-500 font-mono" x-text="'SKU: ' + v.sku"></span>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
+                        <div>
+                            <label class="block text-xs font-bold text-neutral-700 mb-2">Agregar Producto / Variante</label>
+                            <button type="button" @click="contextoCompra = 'editar'; $dispatch('abrir-buscador-global', { index: editarForm.detalles.length })"
+                                    class="w-full text-left rounded-xl border border-neutral-200 px-3 py-2.5 text-sm focus:outline-none bg-white hover:bg-neutral-50 transition-colors flex items-center justify-between">
+                                <span class="text-neutral-400 font-semibold">🔍 Buscar Producto en Inventario</span>
+                                <svg class="w-4 h-4 text-neutral-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+                            </button>
                         </div>
 
                         <!-- Detalles Agregados -->
@@ -634,6 +634,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Componente Global de Búsqueda de Inventario -->
+    <x-buscador-inventario-global />
 
 </div>
 @endsection
