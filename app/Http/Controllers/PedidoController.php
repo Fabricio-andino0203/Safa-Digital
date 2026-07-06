@@ -17,7 +17,8 @@ class PedidoController extends Controller
     {
         $pedidos = Pedido::with(['cliente', 'detalles.variante.producto', 'archivos'])->get()->groupBy('estado');
         $plantillas = \App\Models\MensajePlantilla::where('activa', true)->get();
-        return view('pedidos.index', compact('pedidos', 'plantillas'));
+        $cajaAbierta = \App\Models\CajaSesion::sesionAbierta() !== null;
+        return view('pedidos.index', compact('pedidos', 'plantillas', 'cajaAbierta'));
     }
 
     public function store(Request $request)

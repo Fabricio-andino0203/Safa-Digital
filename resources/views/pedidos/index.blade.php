@@ -596,6 +596,7 @@
                                         <div class="bg-white border border-neutral-200 rounded-2xl p-5 shadow-sm space-y-2">
                                             <h4 class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Funciones Disponibles</h4>
                                             
+                                            @if(auth()->id() === 1 || auth()->user()->tienePermiso('caja'))
                                             <!-- Botonera de Liquidación y Cobros Rápidos -->
                                             <template x-if="Number(pedidoSeleccionado.saldo_pendiente) > 0">
                                                 <div class="flex flex-col gap-2">
@@ -626,6 +627,7 @@
                                                     Marcar como Entregado
                                                 </button>
                                             </template>
+                                            @endif
                                             
                                             <a :href="'/pedidos/' + pedidoSeleccionado.id + '/a4'" target="_blank" download class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-neutral-200 text-neutral-700 text-sm font-bold rounded-xl hover:bg-neutral-50 transition-colors shadow-sm mt-2">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -778,47 +780,65 @@
                     </button>
                 </div>
 
-                <div class="space-y-4">
-                    <!-- Monto -->
-                    <div>
-                        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Monto a Cobrar (L.)</label>
-                        <input type="number" step="0.01" x-model="pagoMonto" :readonly="pagoModo !== 'abonar'"
-                               class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                               placeholder="Ej. 100.00">
-                        <p class="text-[10px] text-neutral-400 mt-1" x-show="pedidoSeleccionado">
-                            Saldo total pendiente: <span class="font-bold" x-text="'L.' + Number(pedidoSeleccionado.saldo_pendiente).toFixed(2)"></span>
-                        </p>
+                <!-- Formulario de Pago (Visible si la caja está abierta) -->
+                <div x-show="cajaAbierta" class="space-y-5">
+                    <div class="space-y-4">
+                        <!-- Monto -->
+                        <div>
+                            <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Monto a Cobrar (L.)</label>
+                            <input type="number" step="0.01" x-model="pagoMonto" :readonly="pagoModo !== 'abonar'"
+                                   class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                                   placeholder="Ej. 100.00">
+                            <p class="text-[10px] text-neutral-400 mt-1" x-show="pedidoSeleccionado">
+                                Saldo total pendiente: <span class="font-bold" x-text="'L.' + Number(pedidoSeleccionado.saldo_pendiente).toFixed(2)"></span>
+                            </p>
+                        </div>
+
+                        <!-- Método de Pago -->
+                        <div>
+                            <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Método de Pago</label>
+                            <select x-model="pagoMetodo" 
+                                    class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900">
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia Bancaria</option>
+                                <option value="tarjeta">Tarjeta de Crédito / Débito</option>
+                            </select>
+                        </div>
+
+                        <!-- Referencia (para Tarjeta o Transferencia) -->
+                        <div x-show="pagoMetodo !== 'efectivo'">
+                            <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Referencia / Comprobante</label>
+                            <input type="text" x-model="pagoReferencia" 
+                                   class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                                   placeholder="Número de referencia...">
+                        </div>
                     </div>
 
-                    <!-- Método de Pago -->
-                    <div>
-                        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Método de Pago</label>
-                        <select x-model="pagoMetodo" 
-                                class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900">
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia">Transferencia Bancaria</option>
-                            <option value="tarjeta">Tarjeta de Crédito / Débito</option>
-                        </select>
-                    </div>
-
-                    <!-- Referencia (para Tarjeta o Transferencia) -->
-                    <div x-show="pagoMetodo !== 'efectivo'">
-                        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Referencia / Comprobante</label>
-                        <input type="text" x-model="pagoReferencia" 
-                               class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                               placeholder="Número de referencia...">
+                    <div class="flex gap-3 pt-3 border-t border-neutral-100">
+                        <button type="button" @click="modalPagosRapidos = false" class="flex-1 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="button" @click="procesarPagoRapido()" :disabled="procesandoPago"
+                                class="flex-1 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm disabled:opacity-50">
+                            <span x-show="!procesandoPago">Confirmar Pago</span>
+                            <span x-show="procesandoPago">Procesando...</span>
+                        </button>
                     </div>
                 </div>
 
-                <div class="flex gap-3 pt-3 border-t border-neutral-100">
-                    <button type="button" @click="modalPagosRapidos = false" class="flex-1 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="button" @click="procesarPagoRapido()" :disabled="procesandoPago"
-                            class="flex-1 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm disabled:opacity-50">
-                        <span x-show="!procesandoPago">Confirmar Pago</span>
-                        <span x-show="procesandoPago">Procesando...</span>
-                    </button>
+                <!-- Restricción de Caja Cerrada (Visible si la caja está cerrada) -->
+                <div x-show="!cajaAbierta" class="py-6 text-center space-y-4">
+                    <div class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <p class="text-sm font-bold text-neutral-800 px-4">
+                        ⚠️ Debes aperturar tu caja en el módulo de POS antes de registrar pagos
+                    </p>
+                    <div class="pt-2">
+                        <button type="button" @click="modalPagosRapidos = false" class="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm">
+                            Entendido
+                        </button>
+                    </div>
                 </div>
 
             </div>
@@ -982,6 +1002,7 @@
             pagoReferencia: '',
             pagoModo: '', // 'abonar', 'liquidar', 'entregar_liquidar'
             procesandoPago: false,
+            cajaAbierta: @json($cajaAbierta),
 
             seleccionarProductoDesdeBuscadorGlobal(detail) {
                 const index = detail.index;
