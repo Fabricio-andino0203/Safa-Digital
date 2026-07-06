@@ -440,6 +440,7 @@ class PosController extends Controller
             'monto_digital'      => 'nullable|numeric|min:0',
             'metodo_digital'     => 'nullable|in:tarjeta,transferencia',
             'referencia_digital' => 'nullable|string|max:255',
+            'accion'             => 'required|in:abonar,liquidar,entregar_liquidar',
         ]);
 
         try {
@@ -459,28 +460,43 @@ class PosController extends Controller
             $monto_a_cobrar = $pedido->saldo_pendiente;
             $cambio = null;
 
-            if ($request->metodo_pago === 'efectivo' && $request->monto_entregado !== null) {
-                if ($request->monto_entregado >= $monto_a_cobrar) {
-                    $cambio = $request->monto_entregado - $monto_a_cobrar;
-                    $monto_pagado = $monto_a_cobrar;
+            if ($request->accion === 'liquidar' || $request->accion === 'entregar_liquidar') {
+                $monto_pagado = $monto_a_cobrar;
+                if ($request->metodo_pago === 'efectivo') {
+                    $monto_entregado = $request->monto_entregado ?? $monto_a_cobrar;
+                    $cambio = max(0, $monto_entregado - $monto_a_cobrar);
+                } elseif ($request->metodo_pago === 'mixto') {
+                    $total_mixto = ($request->monto_efectivo ?? 0) + ($request->monto_digital ?? 0);
+                    $cambio = max(0, $total_mixto - $monto_a_cobrar);
                 } else {
                     $cambio = 0;
-                    $monto_pagado = $request->monto_entregado;
                 }
-            } elseif ($request->metodo_pago === 'tarjeta' || $request->metodo_pago === 'transferencia') {
-                $monto_pagado = $monto_a_cobrar;
-                $cambio = 0;
-            } elseif ($request->metodo_pago === 'mixto') {
-                $total_mixto = $request->monto_efectivo + $request->monto_digital;
-                if ($total_mixto >= $monto_a_cobrar) {
-                    $cambio = $total_mixto - $monto_a_cobrar;
+            } else { // abonar
+                if ($request->metodo_pago === 'efectivo') {
+                    $monto_entregado = $request->monto_entregado ?? 0;
+                    if ($monto_entregado >= $monto_a_cobrar) {
+                        $cambio = $monto_entregado - $monto_a_cobrar;
+                        $monto_pagado = $monto_a_cobrar;
+                    } else {
+                        $cambio = 0;
+                        $monto_pagado = $monto_entregado;
+                    }
+                } elseif ($request->metodo_pago === 'tarjeta' || $request->metodo_pago === 'transferencia') {
                     $monto_pagado = $monto_a_cobrar;
-                } else {
                     $cambio = 0;
-                    $monto_pagado = $total_mixto;
+                } elseif ($request->metodo_pago === 'mixto') {
+                    $total_mixto = ($request->monto_efectivo ?? 0) + ($request->monto_digital ?? 0);
+                    if ($total_mixto >= $monto_a_cobrar) {
+                        $cambio = $total_mixto - $monto_a_cobrar;
+                        $monto_pagado = $monto_a_cobrar;
+                    } else {
+                        $cambio = 0;
+                        $monto_pagado = $total_mixto;
+                    }
+                } else {
+                    $monto_pagado = $monto_a_cobrar;
+                    $cambio = 0;
                 }
-            } else {
-                $monto_pagado = $monto_a_cobrar;
             }
 
             if ($monto_pagado <= 0) {
@@ -492,20 +508,28 @@ class PosController extends Controller
             $pedido->saldo_pendiente -= $monto_pagado;
             
             // Lógica de inventario (descontar stock físico y liberar reserva) al Entregar
-            if ($pedido->saldo_pendiente <= 0 && $pedido->estado !== 'Entregado') {
+            if ($request->accion === 'entregar_liquidar') {
+                $estadoAnterior = $pedido->estado;
                 foreach ($pedido->detalles as $detalle) {
                     if ($detalle->tipo_producto === 'Inventario' && $detalle->variante) {
                         $detalle->variante->confirmarEntrega($detalle->cantidad);
                     }
                 }
                 $pedido->estado = 'Entregado';
+
+                \App\Models\PedidoHistorial::create([
+                    'pedido_id'       => $pedido->id,
+                    'usuario_id'      => auth()->id(),
+                    'estado_anterior' => $estadoAnterior,
+                    'estado_nuevo'    => 'Entregado',
+                ]);
             }
             
             $pedido->save();
 
             // Registrar ingresos en CajaMovimiento (con aislamiento y desglose de cobro mixto)
             $primerMovimientoId = null;
-            $conceptoBase = ($pedido->saldo_pendiente <= 0 ? 'Liquidación' : 'Abono') . ' Pedido ' . $pedido->numero_orden;
+            $conceptoBase = ($request->accion === 'abonar' ? 'Abono' : 'Liquidación') . ' Pedido ' . $pedido->numero_orden;
 
             if ($request->metodo_pago !== 'mixto') {
                 $movimiento = CajaMovimiento::create([

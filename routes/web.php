@@ -51,11 +51,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/archivos',        [PedidoController::class, 'uploadFiles'])->name('uploadFiles');
         Route::post('/{id}/cancelar',        [PedidoController::class, 'cancelar'])->name('cancelar');
         Route::get('/archivo/{id}/download', [PedidoController::class, 'descargarArchivo'])->name('descargarArchivo');
-
-        // Lógica de cobros rápidos (Abonar, Liquidar, Entregar y Liquidar)
-        Route::post('/{id}/abonar',            [PedidoController::class, 'abonar'])->name('abonar');
-        Route::post('/{id}/liquidar',          [PedidoController::class, 'liquidar'])->name('liquidar');
-        Route::post('/{id}/entregar-liquidar', [PedidoController::class, 'entregarYLiquidar'])->name('entregarYLiquidar');
     });
 
     // ─── Configuración Global ──────────────────────────────────────────────────

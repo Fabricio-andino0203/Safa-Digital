@@ -602,12 +602,30 @@
                             <p x-show="(Number(montoEfectivo || 0) + Number(montoDigital || 0)) < Number(pedidoEncontrado?.saldo_pendiente || 0)" class="text-xs text-red-500 font-medium">⚠️ La suma de montos es menor al saldo pendiente.</p>
                         </div>
 
-                        <div class="flex gap-3 mt-6">
-                            <button @click="pedidoEncontrado = null; busquedaPedidoTerm = ''" class="px-6 py-4 bg-white border border-neutral-200 text-neutral-700 font-bold rounded-2xl hover:bg-neutral-50 transition-colors">Volver a Lista</button>
-                            <button @click="pagarPedidoAction()" 
-                                    :disabled="cargandoPagoPedido || (metodoPago === 'efectivo' && montoEntregado <= 0) || (metodoPago === 'mixto' && ((Number(montoEfectivo || 0) + Number(montoDigital || 0)) < Number(pedidoEncontrado?.saldo_pendiente || 0)))"
-                                    class="flex-1 py-4 bg-neutral-900 text-white font-bold rounded-2xl hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span x-text="cargandoPagoPedido ? 'Procesando...' : (montoEntregado >= pedidoEncontrado?.saldo_pendiente || (metodoPago === 'mixto' && (Number(montoEfectivo || 0) + Number(montoDigital || 0)) >= pedidoEncontrado?.saldo_pendiente) || metodoPago === 'tarjeta' || metodoPago === 'transferencia' ? 'Liquidar y Entregar' : 'Registrar Abono')"></span>
+                        <!-- Botonera de Liquidación y Cobros Rápidos -->
+                        <div class="flex flex-col gap-2 mt-6">
+                            <div class="flex gap-2">
+                                <!-- Abonar (Azul) -->
+                                <button @click="pagarPedidoAction('abonar')" 
+                                        :disabled="cargandoPagoPedido || (metodoPago === 'efectivo' && montoEntregado <= 0) || (metodoPago === 'mixto' && (Number(montoEfectivo || 0) + Number(montoDigital || 0)) <= 0)"
+                                        class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-xs uppercase tracking-wider transition-colors shadow-sm">
+                                    Abonar
+                                </button>
+                                <!-- Liquidar (Verde) -->
+                                <button @click="pagarPedidoAction('liquidar')" 
+                                        :disabled="cargandoPagoPedido || (metodoPago === 'efectivo' && montoEntregado < Number(pedidoEncontrado?.saldo_pendiente)) || (metodoPago === 'mixto' && (Number(montoEfectivo || 0) + Number(montoDigital || 0)) < Number(pedidoEncontrado?.saldo_pendiente))"
+                                        class="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-xs uppercase tracking-wider transition-colors shadow-sm">
+                                    Liquidar
+                                </button>
+                                <!-- Entregar y Liquidar (Naranja) -->
+                                <button @click="pagarPedidoAction('entregar_liquidar')" 
+                                        :disabled="cargandoPagoPedido || (metodoPago === 'efectivo' && montoEntregado < Number(pedidoEncontrado?.saldo_pendiente)) || (metodoPago === 'mixto' && (Number(montoEfectivo || 0) + Number(montoDigital || 0)) < Number(pedidoEncontrado?.saldo_pendiente))"
+                                        class="flex-1 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-xs uppercase tracking-wider transition-colors shadow-sm">
+                                    Entregar y Liquidar
+                                </button>
+                            </div>
+                            <button @click="pedidoEncontrado = null; busquedaPedidoTerm = ''" class="w-full py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors border border-neutral-200">
+                                Volver a Lista
                             </button>
                         </div>
                     </div>
@@ -1032,6 +1050,17 @@ function posApp() {
             window.addEventListener('transaccion-procesada', () => {
                 this.actualizarTotalesCaja();
             });
+
+            // Auto open order payment modal if query string exists
+            const urlParams = new URLSearchParams(window.location.search);
+            const ordenParam = urlParams.get('orden');
+            if (ordenParam) {
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState({path: newUrl}, '', newUrl);
+                
+                this.modalCobroPedido = true;
+                this.buscarPedidoAction(ordenParam);
+            }
         },
 
         async actualizarTotalesCaja() {
@@ -1294,11 +1323,11 @@ function posApp() {
             }
         },
 
-        async pagarPedidoAction() {
+        async pagarPedidoAction(accion) {
             if (!this.pedidoEncontrado || this.cargandoPagoPedido) return;
 
-            // Validación de Cobro Mixto
-            if (this.metodoPago === 'mixto') {
+            // Validación de Cobro Mixto para liquidaciones
+            if (this.metodoPago === 'mixto' && (accion === 'liquidar' || accion === 'entregar_liquidar')) {
                 const totalCubierto = Number(this.montoEfectivo || 0) + Number(this.montoDigital || 0);
                 if (totalCubierto < this.pedidoEncontrado.saldo_pendiente) {
                     window.dispatchEvent(new CustomEvent('show-toast', { 
@@ -1327,6 +1356,7 @@ function posApp() {
                         monto_digital:   this.metodoPago === 'mixto' ? this.montoDigital : null,
                         metodo_digital:  this.metodoPago === 'mixto' ? this.metodoDigital : null,
                         referencia_digital: this.metodoPago === 'mixto' ? this.referenciaDigital : null,
+                        accion: accion,
                     })
                 });
                 
