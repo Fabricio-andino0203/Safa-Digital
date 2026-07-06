@@ -113,7 +113,8 @@ class CompraController extends Controller
         $request->validate([
             'detalles' => 'required|array|min:1',
             'detalles.*.id' => 'required|exists:compra_detalles,id',
-            'detalles.*.costo_unitario' => 'required|numeric|min:0.01',
+            'detalles.*.costo_proveedor' => 'required|numeric|min:0',
+            'detalles.*.costo_extra' => 'required|numeric|min:0',
         ]);
 
         DB::beginTransaction();
@@ -121,12 +122,19 @@ class CompraController extends Controller
             $total = 0;
             foreach ($request->detalles as $det) {
                 $detalle = CompraDetalle::findOrFail($det['id']);
-                $subtotal = $detalle->cantidad * $det['costo_unitario'];
+                $costoProveedor = floatval($det['costo_proveedor']);
+                $costoExtra = floatval($det['costo_extra']);
+                $costoTotal = $costoProveedor + $costoExtra;
+
+                $subtotal = $detalle->cantidad * $costoProveedor;
                 $total += $subtotal;
 
                 $detalle->update([
-                    'costo_unitario' => $det['costo_unitario'],
-                    'subtotal' => $subtotal,
+                    'costo_proveedor' => $costoProveedor,
+                    'costo_extra'     => $costoExtra,
+                    'costo_total'     => $costoTotal,
+                    'costo_unitario'  => $costoProveedor, // para compatibilidad
+                    'subtotal'        => $subtotal,       // para compatibilidad
                 ]);
             }
 
@@ -157,11 +165,11 @@ class CompraController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Aumentar stock de las variantes
+            // 1. Aumentar stock de las variantes y actualizar costo interno
             foreach ($compra->detalles as $detalle) {
                 $variante = $detalle->variante;
                 $variante->increment('stock_fisico', $detalle->cantidad);
-                $variante->update(['costo' => $detalle->costo_unitario]);
+                $variante->update(['costo' => $detalle->costo_total]);
             }
 
             // 2. Registrar el Egreso Contable (Bancos)

@@ -18,12 +18,18 @@ class CompraDetalle extends Model
         'cantidad',
         'costo_unitario',
         'subtotal',
+        'costo_proveedor',
+        'costo_extra',
+        'costo_total',
     ];
 
     protected $casts = [
         'costo_unitario' => 'decimal:2',
         'subtotal'       => 'decimal:2',
         'cantidad'       => 'integer',
+        'costo_proveedor'=> 'decimal:2',
+        'costo_extra'    => 'decimal:2',
+        'costo_total'    => 'decimal:2',
     ];
 
     public function compra(): BelongsTo

@@ -141,7 +141,8 @@
                 nombre_completo: nombreProducto + atributosStr,
                 sku: d.variante?.sku || '',
                 cantidad: d.cantidad,
-                costo_unitario: d.variante?.costo || 0.00
+                costo_proveedor: Number(d.variante?.costo || 0.00),
+                costo_extra: 0.00
             };
         });
         this.modalValorar = true;
@@ -551,7 +552,9 @@
                                     <tr class="bg-neutral-50 border-b border-neutral-200 text-xs font-bold text-neutral-500 uppercase">
                                         <th class="px-4 py-3">Producto / Variante</th>
                                         <th class="px-4 py-3 text-center">Cant.</th>
-                                        <th class="px-4 py-3 width-32">Costo Final (L.)</th>
+                                        <th class="px-4 py-3">Costo Proveedor (L.)</th>
+                                        <th class="px-4 py-3">Costo Extra (L.)</th>
+                                        <th class="px-4 py-3 text-right">Costo Total (L.)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -564,8 +567,16 @@
                                             </td>
                                             <td class="px-4 py-3 text-center font-bold text-neutral-700" x-text="d.cantidad"></td>
                                             <td class="px-4 py-3">
-                                                <input type="number" step="0.01" :name="'detalles['+index+'][costo_unitario]'" x-model.number="d.costo_unitario" min="0.01" required
-                                                       class="w-32 rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-center text-gray-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-900">
+                                                <input type="number" step="0.01" :name="'detalles['+index+'][costo_proveedor]'" x-model.number="d.costo_proveedor" min="0" required
+                                                       class="w-28 rounded-lg border border-gray-200 bg-gray-50/50 px-2 py-1 text-sm text-center text-gray-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-900 font-bold">
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <input type="number" step="0.01" :name="'detalles['+index+'][costo_extra]'" x-model.number="d.costo_extra" min="0" required
+                                                       class="w-28 rounded-lg border border-gray-200 bg-gray-50/50 px-2 py-1 text-sm text-center text-gray-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-900 font-bold">
+                                            </td>
+                                            <td class="px-4 py-3 text-right">
+                                                <input type="number" step="0.01" readonly :value="(Number(d.costo_proveedor || 0) + Number(d.costo_extra || 0)).toFixed(2)"
+                                                       class="w-28 rounded-lg border border-neutral-200 bg-neutral-100 px-2 py-1 text-sm text-center text-neutral-600 focus:outline-none font-bold ml-auto">
                                             </td>
                                         </tr>
                                     </template>
