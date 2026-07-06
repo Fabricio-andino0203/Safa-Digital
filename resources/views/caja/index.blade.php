@@ -75,11 +75,27 @@
                         <td class="px-6 py-4 text-right font-bold {{ $movimiento->tipo == 'ingreso' ? 'text-green-600' : 'text-red-600' }}">
                             {{ $movimiento->tipo == 'ingreso' ? '+' : '-' }} L. {{ number_format($movimiento->monto, 2) }}
                         </td>
-                        <td class="px-6 py-4 text-right">
+                        <td class="px-6 py-4 text-right flex items-center justify-end gap-3">
                             <a href="{{ route('caja.ticket', $movimiento->id) }}" target="_blank" class="text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-1 text-sm font-medium">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                 Ticket
                             </a>
+
+                            @if(auth()->id() === 1 || auth()->user()->rol === 'admin')
+                                @if(str_contains($movimiento->concepto, 'Venta POS #'))
+                                    @php
+                                        preg_match('/Venta POS #(\d+)/', $movimiento->concepto, $matches);
+                                        $ventaId = $matches[1] ?? null;
+                                    @endphp
+                                    @if($ventaId)
+                                        <button type="button" 
+                                                @click="confirmarEliminarVenta({{ $ventaId }}, '{{ str_pad($ventaId, 5, '0', STR_PAD_LEFT) }}')"
+                                                class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg border border-red-100 transition-colors shadow-sm">
+                                            Eliminar Venta (Definitivo)
+                                        </button>
+                                    @endif
+                                @endif
+                            @endif
                         </td>
                     </tr>
                     @empty
@@ -152,6 +168,44 @@
                 </div>
             </div>
         </div>
+    <!-- Modal: Confirmar Eliminación de Venta -->
+    <div x-show="modalEliminar" class="relative z-50" x-cloak>
+        <div x-show="modalEliminar" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+
+        <div class="fixed inset-0 overflow-y-auto flex items-center justify-center p-4">
+            <div x-show="modalEliminar"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 @click.away="modalEliminar = false"
+                 class="relative w-full max-w-md transform overflow-hidden rounded-3xl bg-white shadow-2xl p-7 border border-neutral-100 space-y-6">
+                
+                <div class="text-center space-y-3">
+                    <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-neutral-900">¿Estás seguro?</h3>
+                    <p class="text-sm text-neutral-500">
+                        Esta acción borrará la venta <span class="font-mono font-bold text-neutral-900">#VTA-<span x-text="ventaAEliminarNumero"></span></span> para siempre. 
+                        Se revertirá el stock de los productos vendidos y se eliminará el movimiento de la sesión de caja.
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" @click="modalEliminar = false" class="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors border border-neutral-200">
+                        No, mantener
+                    </button>
+                    <button type="button" @click="ejecutarEliminacion()" :disabled="cargandoEliminacion"
+                            class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-colors shadow-sm disabled:opacity-50">
+                        <span x-show="!cargandoEliminacion">Eliminar Venta (Definitivo)</span>
+                        <span x-show="cargandoEliminacion">Eliminando...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -167,10 +221,44 @@
                 monto: '',
                 concepto: ''
             },
+            modalEliminar: false,
+            ventaAEliminarId: null,
+            ventaAEliminarNumero: '',
+            cargandoEliminacion: false,
+
             checkReglas() {
                 // Regla Innegociable: Los Retiros se descuentan de Bancos
                 if (this.form.tipo === 'egreso') {
                     this.form.metodo = 'Bancos';
+                }
+            },
+            confirmarEliminarVenta(id, numero) {
+                this.ventaAEliminarId = id;
+                this.ventaAEliminarNumero = numero;
+                this.modalEliminar = true;
+            },
+            async ejecutarEliminacion() {
+                if (this.cargandoEliminacion || !this.ventaAEliminarId) return;
+                this.cargandoEliminacion = true;
+                try {
+                    const res = await fetch(`/pos/venta/${this.ventaAEliminarId}/eliminar`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        }
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Error al eliminar la venta.');
+                    }
+                } catch (e) {
+                    alert('Error de conexión al servidor.');
+                } finally {
+                    this.cargandoEliminacion = false;
+                    this.modalEliminar = false;
                 }
             },
             async submitMovimiento() {
