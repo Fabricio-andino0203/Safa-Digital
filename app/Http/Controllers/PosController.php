@@ -410,6 +410,102 @@ class PosController extends Controller
         return $pdf->stream('ticket_venta_' . $venta->id . '.pdf');
     }
 
+    public function cancelarVenta(Request $request, $id)
+    {
+        if (auth()->id() !== 1 && (!auth()->user()->rol || auth()->user()->rol !== 'admin')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado. Esta acción es exclusiva para administradores.'
+            ], 403);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $venta = VentaPos::with('detalles.variante')->findOrFail($id);
+
+            if ($venta->estado === 'cancelada') {
+                throw new \Exception('Esta venta ya ha sido cancelada.');
+            }
+
+            // TAREA 2: LÓGICA DE REVERSIÓN LOGÍSTICA (INVENTARIO)
+            foreach ($venta->detalles as $detalle) {
+                if ($detalle->variante) {
+                    $detalle->variante->increment('stock_fisico', $detalle->cantidad);
+                }
+            }
+
+            // TAREA 3: LÓGICA DE REVERSIÓN FINANCIERA (CAJA)
+            $sesionActiva = CajaSesion::sesionAbierta();
+            if (!$sesionActiva) {
+                throw new \Exception('No hay una sesión de caja activa abierta para registrar la reversión.');
+            }
+
+            $montoTotal = floatval($venta->total);
+            $numeroVenta = str_pad($venta->id, 5, '0', STR_PAD_LEFT);
+            $conceptoEgreso = "Cancelación de Venta #VTA-" . $numeroVenta;
+
+            $movimientosOriginales = CajaMovimiento::where('caja_sesion_id', $venta->caja_sesion_id)
+                ->where('tipo', 'ingreso')
+                ->where('concepto', 'LIKE', "%Venta POS #{$venta->id}%")
+                ->get();
+
+            if ($movimientosOriginales->isEmpty()) {
+                if ($venta->metodo_pago === 'efectivo') {
+                    CajaMovimiento::create([
+                        'caja_sesion_id' => $sesionActiva->id,
+                        'tipo'           => 'egreso',
+                        'monto'          => $montoTotal,
+                        'concepto'       => $conceptoEgreso,
+                        'referencia'     => 'Efectivo',
+                        'fecha'          => now()->toDateString(),
+                    ]);
+                } else {
+                    CajaMovimiento::create([
+                        'caja_sesion_id' => $sesionActiva->id,
+                        'tipo'           => 'egreso',
+                        'monto'          => $montoTotal,
+                        'concepto'       => $conceptoEgreso,
+                        'referencia'     => strtoupper($venta->metodo_pago),
+                        'fecha'          => now()->toDateString(),
+                    ]);
+                }
+            } else {
+                foreach ($movimientosOriginales as $movOrig) {
+                    CajaMovimiento::create([
+                        'caja_sesion_id' => $sesionActiva->id,
+                        'tipo'           => 'egreso',
+                        'monto'          => $movOrig->monto,
+                        'concepto'       => "Cancelación de Venta #VTA-{$numeroVenta} (" . (($movOrig->referencia === 'EFECTIVO' || $movOrig->referencia === 'Efectivo') ? 'Parte Efectivo' : 'Parte Digital') . ")",
+                        'referencia'     => ($movOrig->referencia === 'EFECTIVO' || $movOrig->referencia === 'Efectivo') ? 'Efectivo' : strtoupper($movOrig->referencia),
+                        'fecha'          => now()->toDateString(),
+                    ]);
+                }
+            }
+
+            // TAREA 4: CAMBIO DE ESTADO (AUDITORÍA PÚBLICA)
+            $venta->update([
+                'estado' => 'cancelada',
+                'cancelado_por' => auth()->id(),
+                'fecha_cancelacion' => now(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Venta cancelada exitosamente y saldos revertidos.'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // INTEGRACIÓN CON PEDIDOS
     // ══════════════════════════════════════════════════════════════════════════
@@ -645,9 +741,10 @@ class PosController extends Controller
         $ingresosBancos = $totales['ingresos_bancos'];
         $retiros = $totales['egresos'];
         $totalEsperado = $totales['total_esperado'];
+        $ventas = $sesion->ventas()->orderBy('created_at', 'desc')->get();
 
         return view('pos.corte', compact(
-            'sesion', 'fondoInicial', 'ventasEfectivo', 'ingresosBancos', 'retiros', 'totalEsperado'
+            'sesion', 'fondoInicial', 'ventasEfectivo', 'ingresosBancos', 'retiros', 'totalEsperado', 'ventas'
         ));
     }
 

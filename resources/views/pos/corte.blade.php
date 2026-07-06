@@ -180,17 +180,32 @@
             </div>
             <div class="divide-y divide-neutral-50 max-h-64 overflow-y-auto">
                 @foreach($ventas as $venta)
-                <div class="flex items-center justify-between px-6 py-3.5">
+                <div class="flex items-center justify-between px-6 py-3.5 {{ $venta->estado === 'cancelada' ? 'bg-red-50/30 opacity-75' : '' }}">
                     <div>
                         <span class="text-xs font-mono text-neutral-400">#{{ str_pad($venta->id, 5, '0', STR_PAD_LEFT) }}</span>
                         <span class="ml-3 text-xs font-medium bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-lg">
                             {{ ['efectivo'=>'💵','tarjeta'=>'💳','transferencia'=>'🏦','mixto'=>'🔀'][$venta->metodo_pago] ?? '' }}
                             {{ $venta->label_metodo_pago }}
                         </span>
+                        @if($venta->estado === 'cancelada')
+                            <span class="ml-2 text-xs font-bold text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md">CANCELADA</span>
+                        @endif
                     </div>
-                    <div class="text-right">
-                        <span class="text-sm font-bold text-neutral-900"> L.{{ number_format($venta->total, 2) }}</span>
-                        <span class="block text-xs text-neutral-400">{{ $venta->created_at->format('H:i') }}</span>
+                    <div class="flex items-center gap-4 text-right">
+                        <div>
+                            <span class="text-sm font-bold {{ $venta->estado === 'cancelada' ? 'line-through text-neutral-400' : 'text-neutral-900' }}"> L.{{ number_format($venta->total, 2) }}</span>
+                            <span class="block text-xs text-neutral-400">{{ $venta->created_at->format('H:i') }}</span>
+                        </div>
+
+                        @if(auth()->id() === 1 || auth()->user()->rol === 'admin')
+                            @if($venta->estado !== 'cancelada')
+                                <button type="button" 
+                                        @click="confirmarCancelarVenta({{ $venta->id }}, '{{ str_pad($venta->id, 5, '0', STR_PAD_LEFT) }}')"
+                                        class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg border border-red-100 transition-colors shadow-sm">
+                                    Cancelar Venta
+                                </button>
+                            @endif
+                        @endif
                     </div>
                 </div>
                 @endforeach
@@ -198,6 +213,44 @@
         </div>
         @endif
 
+    <!-- Modal: Confirmar Cancelación de Venta -->
+    <div x-show="modalCancelar" class="relative z-50" x-cloak>
+        <div x-show="modalCancelar" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+
+        <div class="fixed inset-0 overflow-y-auto flex items-center justify-center p-4">
+            <div x-show="modalCancelar"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 @click.away="modalCancelar = false"
+                 class="relative w-full max-w-md transform overflow-hidden rounded-3xl bg-white shadow-2xl p-7 border border-neutral-100 space-y-6">
+                
+                <div class="text-center space-y-3">
+                    <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-neutral-900">¿Estás seguro de cancelar esta venta?</h3>
+                    <p class="text-sm text-neutral-500">
+                        Confirmas la cancelación de la venta <span class="font-mono font-bold text-neutral-900">#VTA-<span x-text="ventaACancelarNumero"></span></span>. 
+                        Esto devolverá el inventario y registrará un egreso financiero en la caja.
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="button" @click="modalCancelar = false" class="flex-1 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors border border-neutral-200">
+                        No, mantener
+                    </button>
+                    <button type="button" @click="ejecutarCancelacion()" :disabled="cargandoCancelacion"
+                            class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-colors shadow-sm disabled:opacity-50">
+                        <span x-show="!cargandoCancelacion">Sí, cancelar venta</span>
+                        <span x-show="cargandoCancelacion">Cancelando...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
@@ -213,8 +266,44 @@ function corteApp() {
         cargando: false,
         error: '',
 
+        modalCancelar: false,
+        ventaACancelarId: null,
+        ventaACancelarNumero: '',
+        cargandoCancelacion: false,
+
         get diferencia() {
             return this.montoContado - this.totalEsperado;
+        },
+
+        confirmarCancelarVenta(id, numero) {
+            this.ventaACancelarId = id;
+            this.ventaACancelarNumero = numero;
+            this.modalCancelar = true;
+        },
+
+        async ejecutarCancelacion() {
+            if (this.cargandoCancelacion || !this.ventaACancelarId) return;
+            this.cargandoCancelacion = true;
+            try {
+                const res = await fetch(`/pos/venta/${this.ventaACancelarId}/cancelar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Error al cancelar la venta.');
+                }
+            } catch (e) {
+                alert('Error de conexión. Verifica el servidor.');
+            } finally {
+                this.cargandoCancelacion = false;
+                this.modalCancelar = false;
+            }
         },
 
         async cerrarCaja() {

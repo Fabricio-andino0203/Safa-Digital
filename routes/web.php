@@ -118,6 +118,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/productos/buscar', [PosController::class, 'buscarProductos'])->name('buscarProductos');
         Route::post('/venta',           [PosController::class, 'procesarVenta'])->name('procesarVenta');
         Route::get('/venta/{id}/ticket', [PosController::class, 'ticketVenta'])->name('ticket');
+        Route::post('/venta/{id}/cancelar', [PosController::class, 'cancelarVenta'])->name('cancelarVenta');
         
         // Integración Pedidos
         Route::get('/pedidos/buscar',   [PosController::class, 'buscarPedido'])->name('buscarPedido');

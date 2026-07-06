@@ -24,6 +24,8 @@ class VentaPos extends Model
         'cambio',
         'estado',
         'notas',
+        'cancelado_por',
+        'fecha_cancelacion',
     ];
 
     protected $casts = [
@@ -46,6 +48,11 @@ class VentaPos extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class);
+    }
+
+    public function canceladoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelado_por');
     }
 
     public function detalles(): HasMany
