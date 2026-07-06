@@ -717,7 +717,10 @@
             obtenerWhatsappUrl(cotizacion) {
                 if(!cotizacion.cliente) return '#';
                 const text = `Hola ${cotizacion.cliente.nombre}, adjunto el enlace a tu cotización ${cotizacion.numero_cotizacion} por un total de L.${Number(cotizacion.total).toFixed(2)}. Puedes verla en el siguiente enlace: ${encodeURIComponent(window.location.origin + '/cotizaciones/' + cotizacion.id + '/pdf')}`;
-                const tel = cotizacion.cliente.telefono ? cotizacion.cliente.telefono.replace(/\D/g, '') : '';
+                let tel = cotizacion.cliente.telefono ? cotizacion.cliente.telefono.replace(/\D/g, '') : '';
+                if (tel && !tel.startsWith('504')) {
+                    tel = '504' + tel;
+                }
                 return `https://wa.me/${tel}?text=${text}`;
             },
 

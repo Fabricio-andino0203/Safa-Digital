@@ -596,11 +596,35 @@
                                         <div class="bg-white border border-neutral-200 rounded-2xl p-5 shadow-sm space-y-2">
                                             <h4 class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Funciones Disponibles</h4>
                                             
+                                            <!-- Botonera de Liquidación y Cobros Rápidos -->
                                             <template x-if="Number(pedidoSeleccionado.saldo_pendiente) > 0">
-                                                <a :href="'/pos?orden=' + pedidoSeleccionado.numero_orden" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-neutral-200 text-neutral-900 text-sm font-bold rounded-xl hover:bg-neutral-50 transition-colors shadow-sm">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                                    Registrar Abono
-                                                </a>
+                                                <div class="flex flex-col gap-2">
+                                                    <!-- Abonar (Azul/Outline) -->
+                                                    <button type="button" @click="abrirPagoRapido('abonar')" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-blue-200 text-blue-700 text-sm font-bold rounded-xl hover:bg-blue-50 transition-colors shadow-sm">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                        Abonar
+                                                    </button>
+                                                    <div class="grid grid-cols-2 gap-2">
+                                                        <!-- Liquidar (Verde/Outline) -->
+                                                        <button type="button" @click="abrirPagoRapido('liquidar')" class="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white border border-green-200 text-green-700 text-xs font-bold rounded-xl hover:bg-green-50 transition-colors shadow-sm">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                            Liquidar
+                                                        </button>
+                                                        <!-- Entregar y Liquidar (Naranja/Outline) -->
+                                                        <button type="button" @click="abrirPagoRapido('entregar_liquidar')" class="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white border border-orange-200 text-orange-700 text-xs font-bold rounded-xl hover:bg-orange-50 transition-colors shadow-sm">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                                            Entregar y Liquidar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            <!-- Si ya está pagado pero no entregado: Marcar como Entregado -->
+                                            <template x-if="Number(pedidoSeleccionado.saldo_pendiente) <= 0 && pedidoSeleccionado.estado !== 'Entregado'">
+                                                <button type="button" @click="estadoTemp = 'Entregado'; ejecutarCambioEstado(pedidoSeleccionado, false);" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-orange-200 text-orange-700 text-sm font-bold rounded-xl hover:bg-orange-50 transition-colors shadow-sm">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                                    Marcar como Entregado
+                                                </button>
                                             </template>
                                             
                                             <a :href="'/pedidos/' + pedidoSeleccionado.id + '/a4'" target="_blank" download class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-neutral-200 text-neutral-700 text-sm font-bold rounded-xl hover:bg-neutral-50 transition-colors shadow-sm mt-2">
@@ -614,7 +638,7 @@
                                             </a>
                                             
                                             <template x-if="pedidoSeleccionado.cliente?.telefono">
-                                                <a :href="'https://wa.me/' + pedidoSeleccionado.cliente.telefono.replace(/\D/g,'') + '?text=Hola ' + pedidoSeleccionado.cliente.nombre + ', aquí tienes el enlace a tu pedido: ' + encodeURIComponent('{{ url('/') }}/pedidos/track/' + pedidoSeleccionado.numero_orden)" target="_blank" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-50 border border-green-200 text-green-700 text-sm font-bold rounded-xl hover:bg-green-100 transition-colors shadow-sm mt-2">
+                                                <a :href="'https://wa.me/' + (pedidoSeleccionado.cliente.telefono.replace(/\D/g,'').startsWith('504') ? pedidoSeleccionado.cliente.telefono.replace(/\D/g,'') : '504' + pedidoSeleccionado.cliente.telefono.replace(/\D/g,'')) + '?text=Hola ' + pedidoSeleccionado.cliente.nombre + ', aquí tienes el enlace a tu pedido: ' + encodeURIComponent('{{ url('/') }}/pedidos/track/' + pedidoSeleccionado.numero_orden)" target="_blank" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-50 border border-green-200 text-green-700 text-sm font-bold rounded-xl hover:bg-green-100 transition-colors shadow-sm mt-2">
                                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51h-.57c-.199 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                                                     Compartir por WhatsApp
                                                 </a>
@@ -726,6 +750,77 @@
                     </div>
 
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Registrar Pago Rápido -->
+    <div x-show="modalPagosRapidos" class="relative z-[60]" x-cloak>
+        <div x-show="modalPagosRapidos" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+        <div class="fixed inset-0 overflow-y-auto flex items-center justify-center p-4">
+            <div x-show="modalPagosRapidos" 
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 class="bg-white rounded-3xl border border-neutral-200 p-7 max-w-md w-full shadow-2xl space-y-5">
+                
+                <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
+                    <h3 class="text-lg font-bold text-neutral-900">
+                        <span x-show="pagoModo === 'abonar'">Registrar Abono Parcial</span>
+                        <span x-show="pagoModo === 'liquidar'">Liquidar Pedido</span>
+                        <span x-show="pagoModo === 'entregar_liquidar'">Entregar y Liquidar Pedido</span>
+                    </h3>
+                    <button @click="modalPagosRapidos = false" class="text-neutral-400 hover:text-neutral-700 bg-neutral-100 p-2 rounded-xl transition-all">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Monto -->
+                    <div>
+                        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Monto a Cobrar (L.)</label>
+                        <input type="number" step="0.01" x-model="pagoMonto" :readonly="pagoModo !== 'abonar'"
+                               class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                               placeholder="Ej. 100.00">
+                        <p class="text-[10px] text-neutral-400 mt-1" x-show="pedidoSeleccionado">
+                            Saldo total pendiente: <span class="font-bold" x-text="'L.' + Number(pedidoSeleccionado.saldo_pendiente).toFixed(2)"></span>
+                        </p>
+                    </div>
+
+                    <!-- Método de Pago -->
+                    <div>
+                        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Método de Pago</label>
+                        <select x-model="pagoMetodo" 
+                                class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900">
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia">Transferencia Bancaria</option>
+                            <option value="tarjeta">Tarjeta de Crédito / Débito</option>
+                        </select>
+                    </div>
+
+                    <!-- Referencia (para Tarjeta o Transferencia) -->
+                    <div x-show="pagoMetodo !== 'efectivo'">
+                        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Referencia / Comprobante</label>
+                        <input type="text" x-model="pagoReferencia" 
+                               class="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                               placeholder="Número de referencia...">
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-3 border-t border-neutral-100">
+                    <button type="button" @click="modalPagosRapidos = false" class="flex-1 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" @click="procesarPagoRapido()" :disabled="procesandoPago"
+                            class="flex-1 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm disabled:opacity-50">
+                        <span x-show="!procesandoPago">Confirmar Pago</span>
+                        <span x-show="procesandoPago">Procesando...</span>
+                    </button>
+                </div>
+
             </div>
         </div>
     </div>
@@ -881,6 +976,12 @@
             clienteSeleccionadoObj: null,
             creandoCliente: false,
             nuevoCliente: { nombre: '', telefono: '', email: '' },
+            modalPagosRapidos: false,
+            pagoMonto: 0,
+            pagoMetodo: 'efectivo',
+            pagoReferencia: '',
+            pagoModo: '', // 'abonar', 'liquidar', 'entregar_liquidar'
+            procesandoPago: false,
 
             seleccionarProductoDesdeBuscadorGlobal(detail) {
                 const index = detail.index;
@@ -1387,8 +1488,83 @@
                 mensaje = mensaje.replace(/\{empresa\}/g,        'SAFA DIGITAL');
                 mensaje = mensaje.replace(/\{link\}/g,           linkSeguimiento);
 
-                const telefono = pedido.cliente.telefono.replace(/[^0-9]/g, '');
+                let telefono = pedido.cliente.telefono.replace(/[^0-9]/g, '');
+                if (telefono && !telefono.startsWith('504')) {
+                    telefono = '504' + telefono;
+                }
                 window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`, '_blank');
+            },
+
+            abrirPagoRapido(modo) {
+                this.pagoModo = modo;
+                this.pagoMetodo = 'efectivo';
+                this.pagoReferencia = '';
+                if (modo === 'abonar') {
+                    this.pagoMonto = '';
+                } else {
+                    this.pagoMonto = Number(this.pedidoSeleccionado.saldo_pendiente).toFixed(2);
+                }
+                this.modalPagosRapidos = true;
+            },
+
+            async procesarPagoRapido() {
+                if (this.pagoModo === 'abonar') {
+                    const montoNum = parseFloat(this.pagoMonto);
+                    if (isNaN(montoNum) || montoNum <= 0) {
+                        alert('Por favor ingrese un monto válido mayor a 0.');
+                        return;
+                    }
+                    if (montoNum > parseFloat(this.pedidoSeleccionado.saldo_pendiente)) {
+                        alert('El monto no puede superar el saldo pendiente.');
+                        return;
+                    }
+                }
+                
+                this.procesandoPago = true;
+                let url = '';
+                let body = {
+                    metodo_pago: this.pagoMetodo,
+                    referencia: this.pagoReferencia
+                };
+                
+                if (this.pagoModo === 'abonar') {
+                    url = `/pedidos/${this.pedidoSeleccionado.id}/abonar`;
+                    body.monto = this.pagoMonto;
+                } else if (this.pagoModo === 'liquidar') {
+                    url = `/pedidos/${this.pedidoSeleccionado.id}/liquidar`;
+                } else if (this.pagoModo === 'entregar_liquidar') {
+                    url = `/pedidos/${this.pedidoSeleccionado.id}/entregar-liquidar`;
+                }
+                
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify(body)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        this.pedidoSeleccionado = data.pedido;
+                        this.actualizarPedidoEnTablero(data.pedido);
+                        
+                        if (data.ticket_url) {
+                            window.open(data.ticket_url, '_blank');
+                        }
+                        
+                        this.modalPagosRapidos = false;
+                        alert('Pago registrado con éxito.');
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Error al procesar el pago.');
+                    }
+                } catch (e) {
+                    alert('Error de conexión al procesar el pago.');
+                } finally {
+                    this.procesandoPago = false;
+                }
             }
         }
     }
