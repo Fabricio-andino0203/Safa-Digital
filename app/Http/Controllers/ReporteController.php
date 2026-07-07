@@ -117,6 +117,7 @@ class ReporteController extends Controller
         $fin = \Carbon\Carbon::parse($request->fecha_fin)->endOfDay()->toDateTimeString();
 
         // 1. Obtener detalles de pedidos tradicionales entregados
+        //    HOTFIX: Se incluye la columna 'extras' (JSON snapshot) para calcular el Costo Real
         $detallesPedidos = DB::table('pedido_detalles')
             ->join('pedidos', 'pedido_detalles.pedido_id', '=', 'pedidos.id')
             ->leftJoin('producto_variantes', 'pedido_detalles.producto_variante_id', '=', 'producto_variantes.id')
@@ -124,13 +125,16 @@ class ReporteController extends Controller
                 DB::raw('COALESCE(pedido_detalles.nombre_snapshot, pedido_detalles.nombre_libre) as nombre_item'),
                 'pedido_detalles.cantidad',
                 'pedido_detalles.precio_venta as precio_venta',
-                'producto_variantes.costo as costo_unitario'
+                'producto_variantes.costo as costo_base',
+                'pedido_detalles.extras as extras_json'
             )
             ->whereBetween('pedidos.created_at', [$inicio, $fin])
             ->where('pedidos.estado', 'Entregado')
             ->get();
 
         // 2. Obtener detalles de ventas directas realizadas desde el POS
+        //    NOTA: costo_unitario en venta_pos_detalles YA incluye el costo de los extras
+        //    (calculado al momento de procesar la venta en PosController::procesarVenta)
         $detallesVentasPos = DB::table('venta_pos_detalles')
             ->join('ventas_pos', 'venta_pos_detalles.venta_pos_id', '=', 'ventas_pos.id')
             ->leftJoin('producto_variantes', 'venta_pos_detalles.variante_id', '=', 'producto_variantes.id')
@@ -144,18 +148,54 @@ class ReporteController extends Controller
             ->where('ventas_pos.estado', 'completada')
             ->get();
 
-        // Combinar ambas colecciones
-        $detalles = $detallesPedidos->concat($detallesVentasPos);
-
         $totalVentas = 0;
         $totalCostos = 0;
         $totalGanancias = 0;
         $items = [];
 
-        foreach ($detalles as $d) {
+        // ── Procesar Pedidos: Costo Real = Costo Base + Σ Costos de Extras ──────
+        foreach ($detallesPedidos as $d) {
             $cant = (int) $d->cantidad;
             $precio = (float) $d->precio_venta;
-            $costo = (float) ($d->costo_unitario ?? 0.00); // Si costo es null o cero, no se excluye, se asume 0.00
+            $costoBase = (float) ($d->costo_base ?? 0.00);
+
+            // HOTFIX: Leer extras desde el snapshot JSON histórico del detalle
+            $costoExtras = 0;
+            $extras = is_string($d->extras_json) ? json_decode($d->extras_json, true) : null;
+            if (is_array($extras)) {
+                foreach ($extras as $extra) {
+                    $cantidadExtra = max(1, intval($extra['cantidad'] ?? 1));
+                    $costoExtras += floatval($extra['costo'] ?? 0) * $cantidadExtra;
+                }
+            }
+
+            // Costo Real Unitario = costo del producto + costo de todos los extras aplicados
+            $costoReal = $costoBase + $costoExtras;
+
+            $subVenta = $precio * $cant;
+            $subCosto = $costoReal * $cant;
+            $ganancia = $subVenta - $subCosto;
+
+            $totalVentas += $subVenta;
+            $totalCostos += $subCosto;
+            $totalGanancias += $ganancia;
+
+            $items[] = [
+                'nombre' => $d->nombre_item,
+                'cantidad' => $cant,
+                'precio' => $precio,
+                'costo' => $costoReal,
+                'subtotal_venta' => $subVenta,
+                'subtotal_costo' => $subCosto,
+                'ganancia' => $ganancia,
+            ];
+        }
+
+        // ── Procesar Ventas POS: costo_unitario ya incluye extras (grabado en venta) ─
+        foreach ($detallesVentasPos as $d) {
+            $cant = (int) $d->cantidad;
+            $precio = (float) $d->precio_venta;
+            $costo = (float) ($d->costo_unitario ?? 0.00);
 
             $subVenta = $precio * $cant;
             $subCosto = $costo * $cant;
