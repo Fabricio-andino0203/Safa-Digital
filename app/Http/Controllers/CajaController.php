@@ -7,11 +7,17 @@ use Illuminate\Http\Request;
 
 class CajaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Balance del día actual
+        // Filtros de fecha: si no se proporcionan, últimos 30 días por defecto
+        $fechaInicio = $request->input('fecha_inicio', now()->subDays(30)->toDateString());
+        $fechaFin = $request->input('fecha_fin', now()->toDateString());
+
+        // Movimientos filtrados por rango de fechas
         $movimientosHoy = CajaMovimiento::with('pedido')
-            ->whereDate('fecha', now()->toDateString())
+            ->whereDate('fecha', '>=', $fechaInicio)
+            ->whereDate('fecha', '<=', $fechaFin)
+            ->orderBy('fecha', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -34,7 +40,24 @@ class CajaController extends Controller
             return $m->tipo === 'egreso';
         })->sum('monto');
 
-        return view('caja.index', compact('movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance', 'balanceEfectivo', 'balanceBancos'));
+        return view('caja.index', compact('movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance', 'balanceEfectivo', 'balanceBancos', 'fechaInicio', 'fechaFin'));
+    }
+
+    /**
+     * Eliminar un movimiento de caja de forma definitiva (Hard Delete).
+     * Solo accesible por administradores.
+     */
+    public function eliminarMovimiento($id)
+    {
+        $user = auth()->user();
+        if ($user->id !== 1 && $user->rol !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'No tienes permiso para realizar esta acción.'], 403);
+        }
+
+        $movimiento = CajaMovimiento::findOrFail($id);
+        $movimiento->delete();
+
+        return response()->json(['success' => true, 'message' => 'Movimiento eliminado permanentemente.']);
     }
 
     public function store(Request $request)

@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/',  [CajaController::class, 'index'])->name('index');
         Route::post('/', [CajaController::class, 'store'])->name('store');
         Route::get('/{id}/ticket', [CajaController::class, 'descargarTicket'])->name('ticket');
+        Route::delete('/{id}/eliminar', [CajaController::class, 'eliminarMovimiento'])->name('eliminar');
     });
 
     // ─── Inventario ───────────────────────────────────────────────────────────────
