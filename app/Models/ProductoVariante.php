@@ -40,6 +40,7 @@ class ProductoVariante extends Model
     protected $appends = [
         'nombre_completo',
         'stock_disponible',
+        'controlar_stock',
     ];
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -80,6 +81,14 @@ class ProductoVariante extends Model
     }
 
     /**
+     * Accesor para saber si la variante pertenece a un producto que controla stock.
+     */
+    public function getControlarStockAttribute(): bool
+    {
+        return (bool) ($this->producto?->controlar_stock ?? true);
+    }
+
+    /**
      * Indica si la variante tiene bajo stock (útil para alertas en UI).
      */
     public function getBajoStockAttribute(): bool
@@ -116,15 +125,15 @@ class ProductoVariante extends Model
      */
     public function reservar(int $cantidad): void
     {
-        if (!$this->producto?->controlar_stock) {
+        if ($this->controlar_stock) {
+            if ($this->stock_disponible < $cantidad) {
+                throw new \Exception(
+                    "Stock insuficiente para '{$this->nombre_completo}'. " .
+                    "Disponible: {$this->stock_disponible}, Solicitado: {$cantidad}."
+                );
+            }
+        } else {
             return;
-        }
-
-        if ($this->stock_disponible < $cantidad) {
-            throw new \Exception(
-                "Stock insuficiente para '{$this->nombre_completo}'. " .
-                "Disponible: {$this->stock_disponible}, Solicitado: {$cantidad}."
-            );
         }
 
         $this->increment('stock_reservado', $cantidad);
@@ -170,15 +179,15 @@ class ProductoVariante extends Model
      */
     public function venderDirecto(int $cantidad): void
     {
-        if (!$this->producto?->controlar_stock) {
+        if ($this->controlar_stock) {
+            if ($this->stock_disponible < $cantidad) {
+                throw new \Exception(
+                    "Stock insuficiente para '{$this->nombre_completo}'. " .
+                    "Disponible: {$this->stock_disponible}, Solicitado: {$cantidad}."
+                );
+            }
+        } else {
             return;
-        }
-
-        if ($this->stock_disponible < $cantidad) {
-            throw new \Exception(
-                "Stock insuficiente para '{$this->nombre_completo}'. " .
-                "Disponible: {$this->stock_disponible}, Solicitado: {$cantidad}."
-            );
         }
 
         $this->decrement('stock_fisico', $cantidad);

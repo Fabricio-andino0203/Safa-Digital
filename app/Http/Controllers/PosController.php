@@ -226,11 +226,14 @@ class PosController extends Controller
             foreach ($request->carrito as $item) {
                 $variante = ProductoVariante::lockForUpdate()->findOrFail($item['id']);
 
-                if (($variante->producto?->controlar_stock ?? true) && $variante->stock_disponible < $item['qty']) {
-                    throw new \Exception(
-                        "Stock insuficiente para '{$variante->nombre_completo}'. " .
-                        "Disponible: {$variante->stock_disponible}"
-                    );
+                // Si el producto/variante DEBE controlar stock
+                if ($variante->controlar_stock) {
+                    if ($variante->stock_disponible < $item['qty']) {
+                        throw new \Exception(
+                            "Stock insuficiente para '{$variante->nombre_completo}'. " .
+                            "Disponible: {$variante->stock_disponible}"
+                        );
+                    }
                 }
 
                 $extrasCost = 0;
