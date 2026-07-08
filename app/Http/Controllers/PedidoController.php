@@ -225,6 +225,7 @@ class PedidoController extends Controller
                 $mensaje = str_replace('[link_rastreo]', route('pedidos.track', $pedido->numero_orden), $mensaje);
                 $mensaje = str_replace('{link_rastreo}', route('pedidos.track', $pedido->numero_orden), $mensaje);
                 $mensaje = str_replace('[rastreo]', route('pedidos.track', $pedido->numero_orden), $mensaje);
+                $mensaje = str_replace('{rastreo}', route('pedidos.track', $pedido->numero_orden), $mensaje);
 
                 $telefono = preg_replace('/[^0-9]/', '', $pedido->cliente->telefono);
                 if ($telefono && !str_starts_with($telefono, '504')) {

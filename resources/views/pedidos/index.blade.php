@@ -1402,6 +1402,7 @@
                 mensaje = mensaje.replace(/\[link_rastreo\]/g,   linkSeguimiento);
                 mensaje = mensaje.replace(/\{link_rastreo\}/g,   linkSeguimiento);
                 mensaje = mensaje.replace(/\[rastreo\]/g,        linkSeguimiento);
+                mensaje = mensaje.replace(/\{rastreo\}/g,        linkSeguimiento);
 
                 let telefono = pedido.cliente.telefono.replace(/[^0-9]/g, '');
                 if (telefono && !telefono.startsWith('504')) {
