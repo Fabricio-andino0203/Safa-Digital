@@ -6,11 +6,19 @@
 <div x-data="{
     modalMovimiento: false,
     modalTraslado: false,
+    modalEditar: false,
     movimientoForm: {
         cuenta_id: '',
         tipo: 'ingreso',
         monto: '',
         concepto: ''
+    },
+    editForm: {
+        id: '',
+        monto: '',
+        concepto: '',
+        tipo: '',
+        cuenta: ''
     },
     abrirMovimiento(tipo) {
         this.movimientoForm = {
@@ -20,6 +28,16 @@
             concepto: ''
         };
         this.modalMovimiento = true;
+    },
+    abrirEdicion(mov) {
+        this.editForm = {
+            id: mov.id,
+            monto: mov.monto,
+            concepto: mov.concepto,
+            tipo: mov.tipo === 'ingreso' ? 'Depósito' : 'Retiro',
+            cuenta: mov.cuenta.nombre
+        };
+        this.modalEditar = true;
     }
 }" class="max-w-6xl mx-auto space-y-6">
 
@@ -155,6 +173,9 @@
                         <th class="px-6 py-4">Monto</th>
                         <th class="px-6 py-4">Concepto</th>
                         <th class="px-6 py-4">Usuario</th>
+                        @if(auth()->user()->rol == 'admin')
+                        <th class="px-6 py-4">Acciones</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 text-sm text-neutral-700">
@@ -181,10 +202,34 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 text-neutral-500">{{ $mov->usuario->name ?? 'Usuario' }}</td>
+                        @if(auth()->user()->rol == 'admin')
+                        <td class="px-6 py-4 space-x-2 whitespace-nowrap">
+                            <button @click="abrirEdicion({{ json_encode($mov) }})" 
+                                    class="text-blue-600 hover:text-blue-900 font-semibold text-xs inline-flex items-center gap-1"
+                                    title="Editar concepto o monto">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                                Editar
+                            </button>
+                            <form action="{{ route('tesoreria.revertir', $mov->id) }}" method="POST" class="inline-block"
+                                  onsubmit="return confirm('¿Estás seguro de revertir este movimiento? Esto eliminará el registro y ajustará los fondos en la caja activa o banco correspondientes de forma irreversible.');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-red-500 hover:text-red-700 font-semibold text-xs inline-flex items-center gap-1"
+                                        title="Revertir y eliminar">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    Revertir
+                                </button>
+                            </form>
+                        </td>
+                        @endif
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-neutral-400 italic">
+                        <td colspan="{{ auth()->user()->rol == 'admin' ? 7 : 6 }}" class="px-6 py-12 text-center text-neutral-400 italic">
                             No se han registrado movimientos financieros.
                         </td>
                     </tr>
@@ -306,6 +351,64 @@
                             <button type="button" @click="modalTraslado = false" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">Cancelar</button>
                             <button type="submit" class="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm">
                                 Confirmar Traslado
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Movimiento -->
+    <div x-show="modalEditar" class="relative z-50" x-cloak>
+        <div x-show="modalEditar" x-transition.opacity class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm"></div>
+
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div x-show="modalEditar"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 scale-95"
+                     x-transition:enter-end="opacity-100 scale-100"
+                     @click.away="modalEditar = false"
+                     class="relative w-full max-w-md transform overflow-hidden rounded-3xl bg-white shadow-2xl p-7 border border-neutral-100 space-y-5">
+                    
+                    <div class="flex items-center justify-between border-b border-neutral-100 pb-3">
+                        <h3 class="text-lg font-bold text-neutral-900">Editar Movimiento Financiero</h3>
+                        <button @click="modalEditar = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-xl hover:bg-neutral-100 transition-all">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <form :action="'/tesoreria/movimientos/' + editForm.id" method="POST" class="space-y-4">
+                        @csrf
+                        @method('PATCH')
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-500 mb-1">Cuenta</label>
+                            <span class="block text-sm font-bold text-neutral-800 bg-neutral-50 px-4 py-2.5 rounded-xl border border-neutral-200" x-text="editForm.cuenta"></span>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-500 mb-1">Tipo de Movimiento</label>
+                            <span class="block text-sm font-bold text-neutral-800 bg-neutral-50 px-4 py-2.5 rounded-xl border border-neutral-200" x-text="editForm.tipo"></span>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Monto (L.) *</label>
+                            <input type="number" step="0.01" name="monto" x-model="editForm.monto" min="0.01" required placeholder="0.00"
+                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"/>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Concepto / Descripción *</label>
+                            <input type="text" name="concepto" x-model="editForm.concepto" required placeholder="Concepto..."
+                                   class="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-800 shadow-sm focus:bg-white focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"/>
+                        </div>
+
+                        <div class="pt-4 flex justify-end gap-3 border-t border-neutral-100">
+                            <button type="button" @click="modalEditar = false" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-sm transition-colors">Cancelar</button>
+                            <button type="submit" class="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold rounded-xl text-sm transition-colors shadow-sm">
+                                Guardar Cambios
                             </button>
                         </div>
                     </form>

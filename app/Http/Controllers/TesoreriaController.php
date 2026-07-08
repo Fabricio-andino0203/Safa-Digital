@@ -139,4 +139,106 @@ class TesoreriaController extends Controller
             return back()->with('error', $e->getMessage())->withInput();
         }
     }
+
+    public function revertirMovimiento($id)
+    {
+        if (Auth::user()->rol !== 'admin') {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $movimiento = MovimientoTesoreria::findOrFail($id);
+            $cuenta = $movimiento->cuenta;
+
+            if ($cuenta->tipo === 'efectivo') {
+                // Regla estricta de caja: aplicar reversión sobre la sesión de caja activa
+                $sesionActiva = \App\Models\CajaSesion::sesionAbierta();
+                if (!$sesionActiva) {
+                    throw new \Exception("No hay una sesión de caja activa abierta para realizar esta reversión en efectivo.");
+                }
+
+                if ($movimiento->tipo === 'egreso') {
+                    // Revertir egreso (Retiro): devolver dinero a la caja activa (ingreso)
+                    \App\Models\CajaMovimiento::create([
+                        'caja_sesion_id' => $sesionActiva->id,
+                        'tipo'           => 'ingreso',
+                        'monto'          => $movimiento->monto,
+                        'concepto'       => "Reversión de Retiro: " . $movimiento->concepto,
+                        'referencia'     => 'Efectivo',
+                        'fecha'          => now()->toDateString(),
+                    ]);
+                } else {
+                    // Revertir ingreso (Depósito): descontar dinero de la caja activa (egreso)
+                    \App\Models\CajaMovimiento::create([
+                        'caja_sesion_id' => $sesionActiva->id,
+                        'tipo'           => 'egreso',
+                        'monto'          => $movimiento->monto,
+                        'concepto'       => "Reversión de Depósito: " . $movimiento->concepto,
+                        'referencia'     => 'Efectivo',
+                        'fecha'          => now()->toDateString(),
+                    ]);
+                }
+            } else {
+                // Cuenta bancaria: ajustar saldo de forma inversa
+                if ($movimiento->tipo === 'ingreso') {
+                    $cuenta->decrement('saldo_actual', $movimiento->monto);
+                } else {
+                    $cuenta->increment('saldo_actual', $movimiento->monto);
+                }
+            }
+
+            $movimiento->delete();
+            DB::commit();
+
+            return redirect()->route('tesoreria.index')->with('success', 'Movimiento financiero revertido y eliminado con éxito.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error al revertir el movimiento: ' . $e->getMessage());
+        }
+    }
+
+    public function editarMovimiento(Request $request, $id)
+    {
+        if (Auth::user()->rol !== 'admin') {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
+
+        $request->validate([
+            'monto'    => 'required|numeric|min:0.01',
+            'concepto' => 'required|string|max:255',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $movimiento = MovimientoTesoreria::findOrFail($id);
+            $cuenta = $movimiento->cuenta;
+
+            $montoViejo = $movimiento->monto;
+            $montoNuevo = $request->monto;
+            $delta = $montoNuevo - $montoViejo;
+
+            $movimiento->update([
+                'monto'    => $montoNuevo,
+                'concepto' => $request->concepto,
+            ]);
+
+            if (abs($delta) > 0.0001) {
+                if ($movimiento->tipo === 'ingreso') {
+                    // Si el depósito aumentó, sumamos delta. Si disminuyó, restamos delta.
+                    $cuenta->increment('saldo_actual', $delta);
+                } else {
+                    // Si el retiro aumentó, restamos delta de la cuenta. Si disminuyó, sumamos delta.
+                    $cuenta->decrement('saldo_actual', $delta);
+                }
+            }
+
+            DB::commit();
+
+            return redirect()->route('tesoreria.index')->with('success', 'Movimiento financiero editado con éxito.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error al editar el movimiento: ' . $e->getMessage());
+        }
+    }
 }

@@ -157,6 +157,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [TesoreriaController::class, 'index'])->name('index');
         Route::post('/movimiento', [TesoreriaController::class, 'registrarMovimiento'])->name('movimiento');
         Route::post('/traslado', [TesoreriaController::class, 'trasladarFondos'])->name('traslado');
+        Route::patch('/movimientos/{id}', [TesoreriaController::class, 'editarMovimiento'])->name('editar');
+        Route::delete('/movimientos/{id}', [TesoreriaController::class, 'revertirMovimiento'])->name('revertir');
     });
 
     // ─── Reportes y Auditoría ──────────────────────────────────────────────────────
