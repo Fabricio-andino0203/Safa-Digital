@@ -37,6 +37,11 @@ class ProductoVariante extends Model
         'activo'          => 'boolean',
     ];
 
+    protected $appends = [
+        'nombre_completo',
+        'stock_disponible',
+    ];
+
     // ──────────────────────────────────────────────────────────────────────────
     // Relaciones
     // ──────────────────────────────────────────────────────────────────────────
@@ -111,6 +116,10 @@ class ProductoVariante extends Model
      */
     public function reservar(int $cantidad): void
     {
+        if (!$this->producto?->controlar_stock) {
+            return;
+        }
+
         if ($this->stock_disponible < $cantidad) {
             throw new \Exception(
                 "Stock insuficiente para '{$this->nombre_completo}'. " .
@@ -127,6 +136,10 @@ class ProductoVariante extends Model
      */
     public function liberarReserva(int $cantidad): void
     {
+        if (!$this->producto?->controlar_stock) {
+            return;
+        }
+
         $liberar = min($cantidad, $this->stock_reservado); // Nunca dejar negativo
         $this->decrement('stock_reservado', $liberar);
     }
@@ -138,6 +151,10 @@ class ProductoVariante extends Model
      */
     public function confirmarEntrega(int $cantidad): void
     {
+        if (!$this->producto?->controlar_stock) {
+            return;
+        }
+
         $this->decrement('stock_fisico', $cantidad);
         $this->decrement('stock_reservado', min($cantidad, $this->stock_reservado));
         
@@ -153,6 +170,10 @@ class ProductoVariante extends Model
      */
     public function venderDirecto(int $cantidad): void
     {
+        if (!$this->producto?->controlar_stock) {
+            return;
+        }
+
         if ($this->stock_disponible < $cantidad) {
             throw new \Exception(
                 "Stock insuficiente para '{$this->nombre_completo}'. " .

@@ -129,16 +129,17 @@
                 {{-- Stock agregado del producto --}}
                 <div class="col-span-2 text-center">
                     <span class="text-sm font-semibold text-neutral-700"
-                          x-text="producto.variantes.reduce((s,v) => s + v.stock_fisico, 0)"></span>
+                          x-text="producto.controlar_stock ? producto.variantes.reduce((s,v) => s + v.stock_fisico, 0) : '∞'"></span>
                 </div>
                 <div class="col-span-2 text-center">
-                    <span class="text-sm text-amber-600 font-medium"
-                          x-text="producto.variantes.reduce((s,v) => s + v.stock_reservado, 0)"></span>
+                    <span class="text-sm font-medium"
+                          :class="producto.controlar_stock && producto.variantes.reduce((s,v) => s + v.stock_reservado, 0) > 0 ? 'text-amber-600 font-medium' : 'text-neutral-400'"
+                          x-text="producto.controlar_stock ? producto.variantes.reduce((s,v) => s + v.stock_reservado, 0) : '-'"></span>
                 </div>
                 <div class="col-span-2 text-center">
                     <span class="text-sm font-bold"
-                          :class="producto.variantes.reduce((s,v) => s + Math.max(0, v.stock_fisico - v.stock_reservado), 0) === 0 ? 'text-red-500' : 'text-green-600'"
-                          x-text="producto.variantes.reduce((s,v) => s + Math.max(0, v.stock_fisico - v.stock_reservado), 0)"></span>
+                          :class="!producto.controlar_stock ? 'text-blue-600' : (producto.variantes.reduce((s,v) => s + Math.max(0, v.stock_fisico - v.stock_reservado), 0) === 0 ? 'text-red-500' : 'text-green-600')"
+                          x-text="producto.controlar_stock ? producto.variantes.reduce((s,v) => s + Math.max(0, v.stock_fisico - v.stock_reservado), 0) : 'Bajo Pedido'"></span>
                 </div>
                 <div class="col-span-1"></div>
 
@@ -201,36 +202,45 @@
 
                         {{-- Stock físico --}}
                         <div class="col-span-2 text-center">
-                            @if(auth()->id() === 1)
-                            <button @click="abrirModalStock(variante, producto.nombre)"
-                                    class="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 px-2 py-1 rounded-lg transition-all"
-                                    title="Ajustar stock">
-                                <span x-text="variante.stock_fisico"></span>
-                                <svg class="w-3 h-3 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                </svg>
-                            </button>
-                            @else
-                            <span class="text-sm font-semibold text-neutral-700" x-text="variante.stock_fisico"></span>
-                            @endif
+                            <template x-if="producto.controlar_stock">
+                                <div>
+                                    @if(auth()->id() === 1)
+                                    <button @click="abrirModalStock(variante, producto.nombre)"
+                                            class="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-white border border-transparent hover:border-neutral-200 px-2 py-1 rounded-lg transition-all"
+                                            title="Ajustar stock">
+                                        <span x-text="variante.stock_fisico"></span>
+                                        <svg class="w-3 h-3 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                        </svg>
+                                    </button>
+                                    @else
+                                    <span class="text-sm font-semibold text-neutral-700" x-text="variante.stock_fisico"></span>
+                                    @endif
+                                </div>
+                            </template>
+                            <template x-if="!producto.controlar_stock">
+                                <span class="text-sm text-neutral-400 font-medium">∞</span>
+                            </template>
                         </div>
 
                         {{-- Reservado --}}
                         <div class="col-span-2 text-center">
                             <span class="text-sm"
-                                  :class="variante.stock_reservado > 0 ? 'text-amber-600 font-medium' : 'text-neutral-400'"
-                                  x-text="variante.stock_reservado"></span>
+                                  :class="producto.controlar_stock && variante.stock_reservado > 0 ? 'text-amber-600 font-medium' : 'text-neutral-400'"
+                                  x-text="producto.controlar_stock ? variante.stock_reservado : '-'"></span>
                         </div>
 
                         {{-- Disponible --}}
                         <div class="col-span-2 text-center">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                                  :class="Math.max(0, variante.stock_fisico - variante.stock_reservado) <= variante.stock_minimo && variante.stock_minimo > 0
-                                      ? 'bg-red-100 text-red-700'
-                                      : Math.max(0, variante.stock_fisico - variante.stock_reservado) === 0
-                                          ? 'bg-neutral-100 text-neutral-500'
-                                          : 'bg-green-100 text-green-700'"
-                                  x-text="Math.max(0, variante.stock_fisico - variante.stock_reservado)">
+                                  :class="!producto.controlar_stock 
+                                      ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                      : (Math.max(0, variante.stock_fisico - variante.stock_reservado) <= variante.stock_minimo && variante.stock_minimo > 0
+                                          ? 'bg-red-100 text-red-700'
+                                          : Math.max(0, variante.stock_fisico - variante.stock_reservado) === 0
+                                              ? 'bg-neutral-100 text-neutral-500'
+                                              : 'bg-green-100 text-green-700')"
+                                  x-text="producto.controlar_stock ? Math.max(0, variante.stock_fisico - variante.stock_reservado) : 'Bajo Pedido'">
                             </span>
                         </div>
 
@@ -361,6 +371,15 @@
                 <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Descripción</label>
                 <textarea x-model="formProducto.descripcion" rows="2" placeholder="Descripción general del blank..."
                           class="w-full border border-neutral-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-neutral-400 transition-colors resize-none"></textarea>
+            </div>
+
+            {{-- Checkbox: Controlar Stock --}}
+            <div class="flex items-center gap-2 py-1">
+                <input type="checkbox" x-model="formProducto.controlar_stock" id="controlar_stock"
+                       class="rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900"/>
+                <label for="controlar_stock" class="text-sm font-semibold text-neutral-700 select-none cursor-pointer">
+                    Controlar Stock en Inventario
+                </label>
             </div>
 
             {{-- Sección de Extras del Producto --}}
@@ -554,7 +573,7 @@
             </div>
 
             {{-- Stock inicial (solo al crear) --}}
-            <div x-show="!formVariante.id" class="grid grid-cols-2 gap-4">
+            <div x-show="!formVariante.id && (productoActivo?.controlar_stock ?? true)" class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Stock inicial</label>
                     <input type="number" x-model.number="formVariante.stock_fisico" min="0" step="1" placeholder="0"
@@ -885,7 +904,7 @@ function inventarioApp() {
         modalImportarExcel: false,
 
         // Forms
-        formProducto:  { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '', extras: [] },
+        formProducto:  { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '', extras: [], controlar_stock: true },
         formVariante:  { id: null, producto_id: null, sku: '', atributos: [], costo: 0, precio: 0, stock_fisico: 0, stock_minimo: 0, imagen: '' },
         formCategoria: { id: null, nombre: '', extras: [] },
         formExtra:     { id: null, nombre: '', costo: '', precio: '' },
@@ -961,9 +980,10 @@ function inventarioApp() {
                     categoria_id: producto.categoria_id ?? '', 
                     descripcion: producto.descripcion ?? '', 
                     imagen: producto.imagen || '',
-                    extras: producto.extras ? JSON.parse(JSON.stringify(producto.extras)) : []
+                    extras: producto.extras ? JSON.parse(JSON.stringify(producto.extras)) : [],
+                    controlar_stock: producto.controlar_stock !== undefined ? !!producto.controlar_stock : true
                   }
-                : { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '', extras: [] };
+                : { id: null, nombre: '', categoria_id: '', descripcion: '', imagen: '', extras: [], controlar_stock: true };
             this.modalProducto = true;
         },
 
@@ -985,9 +1005,10 @@ function inventarioApp() {
                             p.nombre = data.producto.nombre; 
                             p.categoria = data.producto.categoria?.nombre ?? 'Sin categoría'; 
                             p.extras = data.producto.extras || [];
+                            p.controlar_stock = data.producto.controlar_stock;
                         }
                     } else {
-                        this.todos.push({ ...data.producto, categoria: data.producto.categoria?.nombre ?? 'Sin categoría', variantes: [], extras: data.producto.extras || [] });
+                        this.todos.push({ ...data.producto, categoria: data.producto.categoria?.nombre ?? 'Sin categoría', variantes: [], extras: data.producto.extras || [], controlar_stock: data.producto.controlar_stock });
                     }
                     this.filtrar();
                     this.modalProducto = false;

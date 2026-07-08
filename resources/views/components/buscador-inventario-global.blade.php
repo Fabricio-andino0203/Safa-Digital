@@ -117,6 +117,13 @@
                                          <span x-text="v.nombre_completo"></span>
                                          <span class="text-[10px]" :class="varianteSeleccionada?.id === v.id ? 'text-neutral-200' : 'text-neutral-400'" x-text="'SKU: ' + v.sku"></span>
                                          <span class="text-xs font-black mt-1" x-text="'L. ' + Number(v.precio).toFixed(2)"></span>
+                                         
+                                         {{-- Indicador de Stock --}}
+                                         <div class="mt-1 flex items-center justify-center">
+                                             <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full border"
+                                                   :class="obtenerStockBadge(v).class"
+                                                   x-text="obtenerStockBadge(v).text"></span>
+                                         </div>
                                      </div>
                                  </button>
                              </template>
@@ -272,6 +279,24 @@
             obtenerCantidadExtra(extraId) {
                 const found = this.extrasSeleccionados.find(e => e.id === extraId);
                 return found ? found.cantidad : 0;
+            },
+
+            obtenerStockBadge(v) {
+                if (!this.productoSeleccionado) {
+                    return { text: '', class: 'hidden' };
+                }
+                if (this.productoSeleccionado.controlar_stock === false || this.productoSeleccionado.controlar_stock == 0) {
+                    return { text: '∞ Bajo Pedido', class: 'bg-neutral-100 text-neutral-600 border-neutral-200' };
+                }
+                const stock = parseInt(v.stock_fisico || 0) - parseInt(v.stock_reservado || 0);
+                if (stock <= 0) {
+                    return { text: 'Agotado (0)', class: 'bg-red-50 text-red-700 border-red-200' };
+                }
+                const min = parseInt(v.stock_minimo || 0) || 5;
+                if (stock > min && stock > 5) {
+                    return { text: 'Stock: ' + stock, class: 'bg-green-50 text-green-700 border-green-200' };
+                }
+                return { text: 'Stock: ' + stock, class: 'bg-amber-50 text-amber-700 border-amber-200' };
             },
 
             get totalEstimado() {

@@ -35,8 +35,11 @@ class PosController extends Controller
             $q->where('activo', true)->orderBy('sku');
         }])
         ->where('activo', true)
-        ->whereHas('variantes', function ($q) {
-            $q->where('activo', true)->whereRaw('(stock_fisico - stock_reservado) > 0');
+        ->where(function ($query) {
+            $query->where('controlar_stock', false)
+                  ->orWhereHas('variantes', function ($q) {
+                      $q->where('activo', true)->whereRaw('(stock_fisico - stock_reservado) > 0');
+                  });
         })
         ->orderBy('nombre')
         ->get()
@@ -45,13 +48,14 @@ class PosController extends Controller
             $extrasDisponibles = $producto->extras->merge($producto->categoria ? $producto->categoria->extras : collect())->unique('id')->values();
 
             return [
-                'id'       => $producto->id,
-                'nombre'   => $producto->nombre,
-                'categoria'=> $producto->categoria ? [
+                'id'              => $producto->id,
+                'nombre'          => $producto->nombre,
+                'controlar_stock' => (bool) $producto->controlar_stock,
+                'categoria'       => $producto->categoria ? [
                     'nombre' => $producto->categoria->nombre
                 ] : null,
-                'imagen'   => $producto->imagen,
-                'extras'   => $extrasDisponibles->map(function ($e) {
+                'imagen'          => $producto->imagen,
+                'extras'          => $extrasDisponibles->map(function ($e) {
                     return [
                         'id'     => $e->id,
                         'nombre' => $e->nombre,
@@ -59,14 +63,14 @@ class PosController extends Controller
                         'precio' => (float) $e->precio,
                     ];
                 })->values(),
-                'variantes'=> $producto->variantes->map(function ($v) {
+                'variantes'       => $producto->variantes->map(function ($v) use ($producto) {
                     return [
                         'id'               => $v->id,
                         'sku'              => $v->sku,
                         'nombre_completo'  => $v->nombre_completo,
                         'atributos'        => $v->atributos ?? [],
                         'precio'           => (float) $v->precio,
-                        'stock_disponible' => $v->stock_disponible,
+                        'stock_disponible' => $producto->controlar_stock ? $v->stock_disponible : 999999,
                         'imagen'           => $v->imagen,
                     ];
                 })->values(),
@@ -149,7 +153,12 @@ class PosController extends Controller
 
         $variantes = ProductoVariante::with('producto')
             ->where('activo', true)
-            ->whereRaw('(stock_fisico - stock_reservado) > 0')
+            ->where(function ($q) {
+                $q->whereRaw('(stock_fisico - stock_reservado) > 0')
+                  ->orWhereHas('producto', function ($qp) {
+                      $qp->where('controlar_stock', false);
+                  });
+            })
             ->where(function ($q) use ($query) {
                 $q->where('sku', 'LIKE', "%{$query}%")
                   ->orWhereHas('producto', function ($qp) use ($query) {
@@ -165,7 +174,7 @@ class PosController extends Controller
                 'nombre_completo' => $v->nombre_completo,
                 'atributos'       => $v->atributos ?? [],
                 'precio'          => (float) $v->precio,
-                'stock_disponible'=> $v->stock_disponible,
+                'stock_disponible'=> (bool) ($v->producto?->controlar_stock ?? true) ? $v->stock_disponible : 999999,
                 'imagen'          => $v->imagen,
             ]);
 
@@ -217,7 +226,7 @@ class PosController extends Controller
             foreach ($request->carrito as $item) {
                 $variante = ProductoVariante::lockForUpdate()->findOrFail($item['id']);
 
-                if ($variante->stock_disponible < $item['qty']) {
+                if (($variante->producto?->controlar_stock ?? true) && $variante->stock_disponible < $item['qty']) {
                     throw new \Exception(
                         "Stock insuficiente para '{$variante->nombre_completo}'. " .
                         "Disponible: {$variante->stock_disponible}"

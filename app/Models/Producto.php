@@ -19,10 +19,12 @@ class Producto extends Model
         'descripcion',
         'imagen',
         'activo',
+        'controlar_stock',
     ];
 
     protected $casts = [
         'activo' => 'boolean',
+        'controlar_stock' => 'boolean',
     ];
 
     // ──────────────────────────────────────────────────────────────────────────
