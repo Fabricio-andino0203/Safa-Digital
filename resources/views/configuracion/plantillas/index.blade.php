@@ -36,7 +36,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-neutral-700 mb-1">Contenido del Mensaje</label>
-                    <p class="text-xs text-neutral-500 mb-2">Puedes usar variables: {cliente}, {telefono}, {orden}, {fecha_entrega}, {total}, {abonado}, {saldo}, {empresa}</p>
+                    <p class="text-xs text-neutral-500 mb-2">Puedes usar variables: {cliente}, {telefono}, {orden}, {fecha_entrega}, {total}, {abonado}, {saldo}, {empresa}, [rastreo]</p>
                     <textarea name="contenido" rows="4" required class="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:border-neutral-900 focus:outline-none" placeholder="Hola {cliente}, tu pedido {orden} está en proceso..."></textarea>
                 </div>
                 <div class="flex items-center gap-2">

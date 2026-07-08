@@ -153,7 +153,7 @@
                 <div>
                     <h3 class="text-lg font-bold text-neutral-900">Plantillas de Mensajes</h3>
                     <p class="text-sm text-neutral-500 mt-1">
-                        Utiliza estas variables en el texto: <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{cliente}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{orden}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{fecha_entrega}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{saldo}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{total}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{empresa}</code>.
+                        Utiliza estas variables en el texto: <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{cliente}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{orden}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{fecha_entrega}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{saldo}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{total}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">{empresa}</code>, <code class="bg-neutral-100 px-1 py-0.5 rounded text-xs font-bold">[rastreo]</code>.
                     </p>
                 </div>
 

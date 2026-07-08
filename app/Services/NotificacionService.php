@@ -44,6 +44,7 @@ class NotificacionService
             '{link}'          => route('pedidos.track', $pedido->numero_orden),
             '[link_rastreo]'  => route('pedidos.track', $pedido->numero_orden),
             '{link_rastreo}'  => route('pedidos.track', $pedido->numero_orden),
+            '[rastreo]'       => route('pedidos.track', $pedido->numero_orden),
         ];
 
         return str_replace(array_keys($reemplazos), array_values($reemplazos), $texto);
