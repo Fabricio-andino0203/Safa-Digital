@@ -1399,6 +1399,8 @@
                 mensaje = mensaje.replace(/\{saldo\}/g,          'L. ' + Number(pedido.saldo_pendiente).toFixed(2));
                 mensaje = mensaje.replace(/\{empresa\}/g,        'SAFA DIGITAL');
                 mensaje = mensaje.replace(/\{link\}/g,           linkSeguimiento);
+                mensaje = mensaje.replace(/\[link_rastreo\]/g,   linkSeguimiento);
+                mensaje = mensaje.replace(/\{link_rastreo\}/g,   linkSeguimiento);
 
                 let telefono = pedido.cliente.telefono.replace(/[^0-9]/g, '');
                 if (telefono && !telefono.startsWith('504')) {
