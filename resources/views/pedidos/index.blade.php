@@ -151,7 +151,7 @@
                  class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
                             <!-- Header -->
                             <div class="px-8 py-6 border-b border-neutral-100 flex items-center justify-between bg-[#FAFAFA]">
-                                <h2 class="text-xl font-bold text-neutral-900">Nuevo Pedido</h2>
+                                <h2 class="text-xl font-bold text-neutral-900" x-text="modoEdicion ? 'Editar Pedido' : 'Nuevo Pedido'"></h2>
                                 <button @click="openSlideOver = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 rounded-xl transition-all">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
@@ -423,9 +423,20 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">Detalles del Pedido</h3>
                                 </div>
-                                <button @click="modalDetalles = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-all">
-                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
+                                <div class="flex items-center gap-3">
+                                    <template x-if="pedidoSeleccionado.estado !== 'Entregado' && pedidoSeleccionado.estado !== 'Cancelado'">
+                                        <button @click="abrirEditarPedido(pedidoSeleccionado)" 
+                                                class="px-3.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                            </svg>
+                                            Editar Pedido
+                                        </button>
+                                    </template>
+                                    <button @click="modalDetalles = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-all">
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Body -->
@@ -856,6 +867,8 @@
             },
             filtroActual: 'todos',
             openSlideOver: false,
+            modoEdicion: false,
+            pedidoEditandoId: null,
             guardando: false,
             errorMensaje: '',
             archivosFiles: [], // File objects reales
@@ -954,6 +967,8 @@
                 this.clienteSeleccionadoObj = null;
                 this.creandoCliente = false;
                 this.nuevoCliente = { nombre: '', telefono: '', email: '' };
+                this.modoEdicion = false;
+                this.pedidoEditandoId = null;
                 this.form = {
                     cliente_id: '',
                     prioridad: 'Normal',
@@ -974,6 +989,44 @@
                     this.pedidoSeleccionado = JSON.parse(JSON.stringify(pedido)); // clone
                     this.modalDetalles = true;
                 }
+            },
+
+            abrirEditarPedido(pedido) {
+                this.errorMensaje = '';
+                this.archivosFiles = [];
+                this.archivosLista = [];
+                this.buscarClienteTerm = '';
+                this.clienteSeleccionadoObj = pedido.cliente ? JSON.parse(JSON.stringify(pedido.cliente)) : null;
+                this.creandoCliente = false;
+                
+                // Mapear los detalles del pedido
+                const detallesMapeados = pedido.detalles.map(d => {
+                    return {
+                        id: d.id, // ID del detalle original
+                        tipo_producto: d.tipo_producto,
+                        producto_variante_id: d.producto_variante_id || '',
+                        nombre_libre: d.nombre_libre || '',
+                        descripcion_libre: d.descripcion_libre || '',
+                        cantidad: d.cantidad,
+                        precio_venta: parseFloat(d.precio_venta),
+                        extras: d.extras ? JSON.parse(JSON.stringify(d.extras)) : []
+                    };
+                });
+
+                this.form = {
+                    cliente_id: pedido.cliente_id || '',
+                    prioridad: pedido.prioridad || 'Normal',
+                    fecha_estimada_entrega: pedido.fecha_estimada_entrega ? pedido.fecha_estimada_entrega.substring(0, 10) : '',
+                    hora_estimada_entrega: pedido.hora_estimada_entrega ? pedido.hora_estimada_entrega.substring(0, 5) : '',
+                    notas: pedido.notas || '',
+                    descuento: parseFloat(pedido.descuento || 0),
+                    detalles: detallesMapeados
+                };
+
+                this.modoEdicion = true;
+                this.pedidoEditandoId = pedido.id;
+                this.modalDetalles = false; // cerrar el modal de detalles
+                this.openSlideOver = true; // abrir el modal/slideover del carrito
             },
 
             actualizarPedidoEnTablero(updatedPedido) {
@@ -1269,6 +1322,9 @@
                 formData.append('total_pedido', this.calculoTotal);
 
                 this.form.detalles.forEach((det, i) => {
+                    if (det.id) {
+                        formData.append(`detalles[${i}][id]`, det.id);
+                    }
                     formData.append(`detalles[${i}][tipo_producto]`, det.tipo_producto);
                     formData.append(`detalles[${i}][cantidad]`, det.cantidad);
                     formData.append(`detalles[${i}][precio_venta]`, det.precio_venta);
@@ -1293,8 +1349,13 @@
                     formData.append(`archivos[${i}]`, file);
                 });
 
+                if (this.modoEdicion) {
+                    formData.append('_method', 'PUT');
+                }
+
                 try {
-                    const res = await fetch('/pedidos', {
+                    const url = this.modoEdicion ? `/pedidos/${this.pedidoEditandoId}` : '/pedidos';
+                    const res = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,

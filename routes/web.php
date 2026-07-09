@@ -41,6 +41,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('pedidos')->name('pedidos.')->middleware('permiso:pedidos')->group(function () {
         Route::get('/',              [PedidoController::class, 'index'])->name('index');
         Route::post('/',             [PedidoController::class, 'store'])->name('store');
+        Route::put('/{id}',          [PedidoController::class, 'update'])->name('update');
         Route::patch('/{id}/estado', [PedidoController::class, 'updateEstado'])->name('updateEstado');
         Route::delete('/{id}',       [PedidoController::class, 'destroy'])->name('destroy');
         Route::get('/{id}/ticket',   [PedidoController::class, 'descargarTicket'])->name('ticket');

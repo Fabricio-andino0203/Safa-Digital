@@ -494,5 +494,226 @@ class PedidoController extends Controller
         }
 
         abort(404, 'Archivo no encontrado.');
+    }
+
+    public function update(Request $request, $id)
+    {
+        $pedido = Pedido::with(['detalles.variante', 'archivos'])->findOrFail($id);
+
+        if ($pedido->estado === 'Entregado' || $pedido->estado === 'Cancelado') {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede editar un pedido entregado o cancelado.'
+            ], 422);
+        }
+
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'cliente_id'             => 'nullable|exists:clientes,id',
+            'prioridad'              => 'required|in:Normal,Urgente,Alta Prioridad',
+            'fecha_estimada_entrega' => 'nullable|date',
+            'hora_estimada_entrega'  => 'nullable|date_format:H:i',
+            'notas'                  => 'nullable|string',
+            'subtotal'               => 'required|numeric|min:0',
+            'descuento'              => 'required|numeric|min:0',
+            'total_pedido'           => 'required|numeric|min:0',
+
+            // Detalles
+            'detalles'                        => 'required|array|min:1',
+            'detalles.*.id'                   => 'nullable|exists:pedido_detalles,id',
+            'detalles.*.tipo_producto'        => 'required|in:Inventario,Libre',
+            'detalles.*.producto_variante_id' => 'nullable|required_if:detalles.*.tipo_producto,Inventario|exists:producto_variantes,id',
+            'detalles.*.nombre_libre'         => 'nullable|required_if:detalles.*.tipo_producto,Libre|string',
+            'detalles.*.descripcion_libre'    => 'nullable|string',
+            'detalles.*.cantidad'             => 'required|integer|min:1',
+            'detalles.*.precio_venta'         => 'required|numeric|min:0',
+            'detalles.*.extras'               => 'nullable|array',
+
+            // Archivos adjuntos nuevos
+            'archivos'        => 'nullable|array',
+            'archivos.*'      => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error de validación: ' . $validator->errors()->first()
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        DB::beginTransaction();
+        try {
+            // ── 1. Ajuste de stock e inventario ───────────────────────────────
+            $detallesPrevios = $pedido->detalles->keyBy('id');
+            $nuevosDetallesIds = collect($validated['detalles'])->pluck('id')->filter()->toArray();
+
+            // A. Liberar/Eliminar stock de ítems borrados
+            foreach ($detallesPrevios as $idDetalle => $detallePrevio) {
+                if (!in_array($idDetalle, $nuevosDetallesIds)) {
+                    if ($detallePrevio->tipo_producto === 'Inventario' && $detallePrevio->variante) {
+                        $detallePrevio->variante->liberarReserva($detallePrevio->cantidad);
+                    }
+                    $detallePrevio->delete();
+                }
+            }
+
+            // B. Procesar nuevos e ítems actualizados
+            foreach ($validated['detalles'] as $item) {
+                if (!empty($item['id'])) {
+                    $detallePrevio = $detallesPrevios->get($item['id']);
+                    if ($detallePrevio) {
+                        $cantPrevia = $detallePrevio->cantidad;
+                        $cantNueva = $item['cantidad'];
+
+                        // Si cambió de variante o de tipo, liberamos la anterior y reservamos la nueva
+                        if ($detallePrevio->tipo_producto !== $item['tipo_producto'] || 
+                            ($item['tipo_producto'] === 'Inventario' && $detallePrevio->producto_variante_id != $item['producto_variante_id'])) {
+                            
+                            if ($detallePrevio->tipo_producto === 'Inventario' && $detallePrevio->variante) {
+                                $detallePrevio->variante->liberarReserva($cantPrevia);
+                            }
+
+                            if ($item['tipo_producto'] === 'Inventario') {
+                                $varianteNueva = ProductoVariante::lockForUpdate()->findOrFail($item['producto_variante_id']);
+                                $varianteNueva->reservar($cantNueva);
+                            }
+                        } else {
+                            // Mismo tipo y misma variante, ajustamos la diferencia
+                            if ($item['tipo_producto'] === 'Inventario' && $detallePrevio->variante) {
+                                $diferencia = $cantNueva - $cantPrevia;
+                                if ($diferencia > 0) {
+                                    $detallePrevio->variante->reservar($diferencia);
+                                } elseif ($diferencia < 0) {
+                                    $detallePrevio->variante->liberarReserva(abs($diferencia));
+                                }
+                            }
+                        }
+
+                        // Actualizar registro
+                        $nombreSnapshot = null;
+                        $skuSnapshot = null;
+                        $precioUnitario = $item['precio_venta'];
+
+                        if ($item['tipo_producto'] === 'Inventario') {
+                            $variante = ProductoVariante::findOrFail($item['producto_variante_id']);
+                            $nombreSnapshot = $variante->nombre_completo;
+                            if (!empty($item['extras'])) {
+                                $partesExtras = [];
+                                foreach ($item['extras'] as $ex) {
+                                    $qty = intval($ex['cantidad'] ?? 1);
+                                    $partesExtras[] = $qty > 1 ? "{$qty}x {$ex['nombre']}" : $ex['nombre'];
+                                }
+                                $nombreSnapshot .= ' (' . implode(', ', $partesExtras) . ')';
+                            }
+                            $skuSnapshot = $variante->sku;
+                            $precioUnitario = $variante->precio;
+                        } else {
+                            $nombreSnapshot = $item['nombre_libre'];
+                        }
+
+                        $detallePrevio->update([
+                            'tipo_producto'        => $item['tipo_producto'],
+                            'producto_variante_id' => $item['producto_variante_id'] ?? null,
+                            'nombre_libre'         => $item['nombre_libre'] ?? null,
+                            'descripcion_libre'    => $item['descripcion_libre'] ?? null,
+                            'cantidad'             => $item['cantidad'],
+                            'precio_venta'         => $item['precio_venta'],
+                            'subtotal'             => $item['cantidad'] * $item['precio_venta'],
+                            'extras'               => $item['extras'] ?? null,
+                            'nombre_snapshot'      => $nombreSnapshot,
+                            'sku_snapshot'         => $skuSnapshot,
+                            'precio_unitario'      => $precioUnitario,
+                        ]);
+                    }
+                } else {
+                    // Nuevo ítem agregado al pedido editado
+                    $detalleData = [
+                        'pedido_id'     => $pedido->id,
+                        'tipo_producto' => $item['tipo_producto'],
+                        'cantidad'      => $item['cantidad'],
+                        'precio_venta'  => $item['precio_venta'],
+                        'subtotal'      => $item['cantidad'] * $item['precio_venta'],
+                        'extras'        => $item['extras'] ?? null,
+                    ];
+
+                    if ($item['tipo_producto'] === 'Inventario') {
+                        $variante = ProductoVariante::lockForUpdate()->findOrFail($item['producto_variante_id']);
+                        $variante->reservar($item['cantidad']);
+
+                        $nombreSnapshot = $variante->nombre_completo;
+                        if (!empty($item['extras'])) {
+                            $partesExtras = [];
+                            foreach ($item['extras'] as $ex) {
+                                $qty = intval($ex['cantidad'] ?? 1);
+                                $partesExtras[] = $qty > 1 ? "{$qty}x {$ex['nombre']}" : $ex['nombre'];
+                            }
+                            $nombreSnapshot .= ' (' . implode(', ', $partesExtras) . ')';
+                        }
+
+                        $detalleData['producto_variante_id'] = $variante->id;
+                        $detalleData['nombre_snapshot']      = $nombreSnapshot;
+                        $detalleData['sku_snapshot']         = $variante->sku;
+                        $detalleData['precio_unitario']      = $variante->precio;
+                    } else {
+                        $detalleData['nombre_libre']      = $item['nombre_libre'];
+                        $detalleData['descripcion_libre'] = $item['descripcion_libre'] ?? null;
+                    }
+
+                    PedidoDetalle::create($detalleData);
+                }
+            }
+
+            // ── 2. Recálculo financiero ──────────────────────────────────────
+            $total_pedido = $validated['total_pedido'];
+            $total_abonado = $pedido->total_abonado; // Se mantiene INTACTO
+            $saldo_pendiente = max(0, $total_pedido - $total_abonado); // Estrictamente Nuevo Total - Total Abonado
+
+            $pedido->update([
+                'cliente_id'             => $validated['cliente_id'] ?? $pedido->cliente_id,
+                'prioridad'              => $validated['prioridad'],
+                'subtotal'               => $validated['subtotal'],
+                'descuento'              => $validated['descuento'],
+                'total_pedido'           => $total_pedido,
+                'saldo_pendiente'        => $saldo_pendiente,
+                'fecha_estimada_entrega' => $validated['fecha_estimada_entrega'] ?? null,
+                'hora_estimada_entrega'  => $validated['hora_estimada_entrega'] ?? null,
+                'notas'                  => $validated['notas'] ?? null,
+            ]);
+
+            // ── 3. Persistencia de Diseños ───────────────────────────────────
+            if ($request->hasFile('archivos')) {
+                foreach ($request->file('archivos') as $file) {
+                    $originalName = $file->getClientOriginalName();
+                    $path = $file->store('pedidos/' . $pedido->id, 'public');
+                    PedidoArchivo::create([
+                        'pedido_id'    => $pedido->id,
+                        'ruta_archivo' => $path,
+                        'nombre_real'  => $originalName,
+                    ]);
+                }
+            }
+
+            // ── 4. Registrar en Historial de Pedido ──────────────────────────
+            \App\Models\PedidoHistorial::create([
+                'pedido_id'       => $pedido->id,
+                'usuario_id'      => auth()->id(),
+                'estado_anterior' => $pedido->estado,
+                'estado_nuevo'    => $pedido->estado,
+                'notas'           => 'Pedido editado y recalculado por el administrador.',
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pedido actualizado y recalculado exitosamente.',
+                'pedido'  => $pedido->load(['cliente', 'detalles.variante', 'archivos']),
+            ]);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+        }
     }}
 
