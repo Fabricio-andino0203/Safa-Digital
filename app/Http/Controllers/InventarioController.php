@@ -18,7 +18,11 @@ class InventarioController extends Controller
 
     public function index()
     {
-        $productos  = Producto::with(['categoria', 'variantes', 'extras'])->where('activo', true)->orderBy('nombre')->get();
+        $productos  = Producto::with(['categoria', 'variantes' => function($q) {
+            $q->where('activo', true)
+              ->orderBy('atributos->Color')
+              ->orderBy('atributos->Talla');
+        }, 'extras'])->where('activo', true)->orderBy('nombre')->get();
         $categorias = Categoria::with('extras')->orderBy('nombre')->get();
         $extras     = ProductoExtra::whereNull('producto_id')->orderBy('nombre')->get();
 

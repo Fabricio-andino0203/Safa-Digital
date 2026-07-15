@@ -953,7 +953,11 @@ function inventarioApp() {
             const cat = this.filtroCategoria.toLowerCase();
             this.productosFiltrados = this.todos.filter(p => {
                 const matchNombre = !q || p.nombre.toLowerCase().includes(q)
-                    || p.variantes.some(v => v.sku.toLowerCase().includes(q));
+                    || p.variantes.some(v => {
+                        const skuMatch = v.sku && v.sku.toLowerCase().includes(q);
+                        const attrMatch = v.atributos && Object.values(v.atributos).some(val => String(val).toLowerCase().includes(q));
+                        return skuMatch || attrMatch;
+                    });
                 const matchCat = !cat || p.categoria.toLowerCase() === cat;
                 return matchNombre && matchCat;
             });

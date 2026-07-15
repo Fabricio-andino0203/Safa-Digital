@@ -82,7 +82,7 @@
                  <!-- Header -->
                  <div class="px-8 py-6 border-b border-neutral-100 flex items-center justify-between flex-shrink-0 bg-white">
                      <div>
-                         <h3 class="text-lg font-bold text-neutral-900">Nueva Cotización</h3>
+                         <h3 class="text-lg font-bold text-neutral-900" x-text="modoEdicion ? 'Editar Cotización' : 'Nueva Cotización'"></h3>
                          <p class="text-xs text-neutral-400 mt-1">Generar presupuesto para cliente sin afectar stock</p>
                      </div>
                      <button @click="openSlideOver = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200 rounded-xl transition-all">
@@ -294,9 +294,20 @@
                                 <div>
                                     <h3 class="text-lg font-bold text-neutral-900">Resumen del Presupuesto</h3>
                                 </div>
-                                <button @click="modalDetalles = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-all">
-                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
+                                <div class="flex items-center gap-3">
+                                    <template x-if="!cotizacionSeleccionada.pedido_id">
+                                        <button @click="abrirEditarCotizacion(cotizacionSeleccionada)" 
+                                                class="px-3.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                            </svg>
+                                            Editar Cotización
+                                        </button>
+                                    </template>
+                                    <button @click="modalDetalles = false" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-all">
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Body -->
@@ -499,6 +510,8 @@
         return {
             filtroEstado: 'todas',
             openSlideOver: false,
+            modoEdicion: false,
+            cotizacionEditandoId: null,
             modalDetalles: false,
             modalQuickCliente: false,
             newClient: { nombre: '', telefono: '', email: '' },
@@ -607,6 +620,8 @@
 
             openCreateSlide() {
                 this.errorMensaje = '';
+                this.modoEdicion = false;
+                this.cotizacionEditandoId = null;
                 this.form = {
                     cliente_id: '',
                     validez_dias: 15,
@@ -666,8 +681,10 @@
                 this.errorMensaje = '';
 
                 try {
-                    const res = await fetch('/cotizaciones', {
-                        method: 'POST',
+                    const url = this.modoEdicion ? `/cotizaciones/${this.cotizacionEditandoId}` : '/cotizaciones';
+                    const method = this.modoEdicion ? 'PUT' : 'POST';
+                    const res = await fetch(url, {
+                        method: method,
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': '{{ csrf_token() }}',
@@ -696,6 +713,39 @@
             abrirDetalles(cotizacion) {
                 this.cotizacionSeleccionada = JSON.parse(JSON.stringify(cotizacion));
                 this.modalDetalles = true;
+            },
+
+            abrirEditarCotizacion(cotizacion) {
+                this.errorMensaje = '';
+                this.clienteSeleccionadoObj = cotizacion.cliente ? JSON.parse(JSON.stringify(cotizacion.cliente)) : null;
+                this.buscarClienteTerm = '';
+                
+                const detallesMapeados = cotizacion.detalles.map(d => {
+                    return {
+                        id: d.id,
+                        tipo_producto: d.tipo_producto,
+                        producto_variante_id: d.producto_variante_id || '',
+                        nombre_libre: d.nombre_libre || '',
+                        descripcion_libre: d.descripcion_libre || '',
+                        costo_libre: parseFloat(d.costo_libre || 0),
+                        precio_venta: parseFloat(d.precio_venta || 0),
+                        cantidad: d.cantidad,
+                        extras: d.extras ? JSON.parse(JSON.stringify(d.extras)) : []
+                    };
+                });
+
+                this.form = {
+                    cliente_id: cotizacion.cliente_id || '',
+                    validez_dias: cotizacion.validez_dias || 15,
+                    descuento: parseFloat(cotizacion.descuento || 0),
+                    notas: cotizacion.notas || '',
+                    detalles: detallesMapeados
+                };
+
+                this.modoEdicion = true;
+                this.cotizacionEditandoId = cotizacion.id;
+                this.modalDetalles = false;
+                this.openSlideOver = true;
             },
 
             obtenerCostoTotal(cotizacion) {

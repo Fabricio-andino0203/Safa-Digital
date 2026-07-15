@@ -245,6 +245,110 @@ class CotizacionController extends Controller
         ]);
     }
 
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'cliente_id' => 'required|exists:clientes,id',
+            'descuento' => 'nullable|numeric|min:0',
+            'validez_dias' => 'nullable|integer|min:1',
+            'notas' => 'nullable|string',
+            'detalles' => 'required|array|min:1',
+            'detalles.*.tipo_producto' => 'required|in:Inventario,Libre',
+            'detalles.*.producto_variante_id' => 'required_if:detalles.*.tipo_producto,Inventario|nullable|exists:producto_variantes,id',
+            'detalles.*.nombre_libre' => 'required_if:detalles.*.tipo_producto,Libre|nullable|string',
+            'detalles.*.descripcion_libre' => 'nullable|string',
+            'detalles.*.costo_libre' => 'required_if:detalles.*.tipo_producto,Libre|nullable|numeric|min:0',
+            'detalles.*.precio_venta' => 'required|numeric|min:0',
+            'detalles.*.cantidad' => 'required|integer|min:1',
+            'detalles.*.extras' => 'nullable|array',
+        ]);
+
+        $cotizacion = Cotizacion::findOrFail($id);
+
+        if ($cotizacion->estado === 'Aceptada' && $cotizacion->pedido_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede editar una cotización que ya fue aceptada y convertida a pedido.'
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Calcular montos
+            $subtotal = 0;
+            $detallesValidos = [];
+
+            foreach ($request->detalles as $det) {
+                $lineSubtotal = $det['precio_venta'] * $det['cantidad'];
+                $subtotal += $lineSubtotal;
+
+                $costoTotal = 0;
+                if ($det['tipo_producto'] === 'Inventario' && !empty($det['producto_variante_id'])) {
+                    $variante = ProductoVariante::find($det['producto_variante_id']);
+                    if ($variante) {
+                        $costoTotal = floatval($variante->costo ?? 0);
+                        if (!empty($det['extras'])) {
+                            foreach ($det['extras'] as $ex) {
+                                $extraRecord = \DB::table('producto_extras')->find($ex['id'] ?? null);
+                                $costoExtra = $extraRecord ? floatval($extraRecord->costo) : 0;
+                                $cantidadExtra = max(1, intval($ex['cantidad'] ?? 1));
+                                $costoTotal += $costoExtra * $cantidadExtra;
+                            }
+                        }
+                    }
+                } else {
+                    $costoTotal = $det['costo_libre'] ?? 0;
+                }
+
+                $detallesValidos[] = [
+                    'tipo_producto' => $det['tipo_producto'],
+                    'producto_variante_id' => $det['producto_variante_id'] ?? null,
+                    'nombre_libre' => $det['nombre_libre'] ?? null,
+                    'descripcion_libre' => $det['descripcion_libre'] ?? null,
+                    'costo_libre' => $costoTotal,
+                    'precio_venta' => $det['precio_venta'],
+                    'cantidad' => $det['cantidad'],
+                    'subtotal' => $lineSubtotal,
+                    'extras' => $det['extras'] ?? null,
+                ];
+            }
+
+            $descuento = $request->descuento ?? 0;
+            $total = max(0, $subtotal - $descuento);
+
+            // Actualizar cotización (NO afecta inventario ni caja)
+            $cotizacion->update([
+                'cliente_id' => $request->cliente_id,
+                'validez_dias' => $request->validez_dias ?? 15,
+                'subtotal' => $subtotal,
+                'descuento' => $descuento,
+                'total' => $total,
+                'notas' => $request->notes ?? $request->notas,
+            ]);
+
+            // Eliminar detalles anteriores y volver a crearlos
+            $cotizacion->detalles()->delete();
+
+            foreach ($detallesValidos as $detalleData) {
+                $cotizacion->detalles()->create($detalleData);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cotización actualizada correctamente.',
+                'cotizacion' => $cotizacion,
+                'pdf_url' => route('cotizaciones.pdf', $cotizacion->id),
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
     public function descargarPDF($id)
     {
         ini_set('memory_limit', '512M');

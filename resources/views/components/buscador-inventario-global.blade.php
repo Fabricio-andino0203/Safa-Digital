@@ -1,7 +1,9 @@
 @php
     $categorias = \App\Models\Categoria::with('extras')->orderBy('nombre')->get();
     $productos = \App\Models\Producto::with(['categoria.extras', 'extras', 'variantes' => function($q) {
-        $q->where('activo', true);
+        $q->where('activo', true)
+          ->orderBy('atributos->Color')
+          ->orderBy('atributos->Talla');
     }])->where('activo', true)->orderBy('nombre')->get();
 @endphp
 

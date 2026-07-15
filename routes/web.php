@@ -138,6 +138,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permiso:cotizaciones')->group(function () {
         Route::get('/cotizaciones',           [CotizacionController::class, 'index'])->name('cotizaciones.index');
         Route::post('/cotizaciones',          [CotizacionController::class, 'store'])->name('cotizaciones.store');
+        Route::put('/cotizaciones/{id}',      [CotizacionController::class, 'update'])->name('cotizaciones.update');
         Route::patch('/cotizaciones/{id}/estado', [CotizacionController::class, 'updateEstado'])->name('cotizaciones.updateEstado');
         Route::get('/cotizaciones/{id}/pdf',  [CotizacionController::class, 'descargarPDF'])->name('cotizaciones.pdf');
     });

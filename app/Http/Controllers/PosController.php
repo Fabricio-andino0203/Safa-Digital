@@ -161,6 +161,7 @@ class PosController extends Controller
             })
             ->where(function ($q) use ($query) {
                 $q->where('sku', 'LIKE', "%{$query}%")
+                  ->orWhere('atributos', 'LIKE', "%{$query}%")
                   ->orWhereHas('producto', function ($qp) use ($query) {
                       $qp->where('nombre', 'LIKE', "%{$query}%");
                   });
@@ -369,6 +370,9 @@ class PosController extends Controller
                     'pedido_id'      => null,
                     'fecha'          => now()->toDateString(),
                 ]);
+
+                // INYECCIÓN CENTRAL DE TESORERÍA
+                $this->inyectarMovimientoTesoreria($request->metodo_pago, $total, 'Venta POS #' . $venta->id . ($request->referencia_pago ? ' (Ref: ' . $request->referencia_pago . ')' : ''));
             } else {
                 // Registro por partes para cobro mixto
                 if ($request->monto_efectivo > 0) {
@@ -381,6 +385,9 @@ class PosController extends Controller
                         'pedido_id'      => null,
                         'fecha'          => now()->toDateString(),
                     ]);
+
+                    // INYECCIÓN CENTRAL DE TESORERÍA
+                    $this->inyectarMovimientoTesoreria('efectivo', $request->monto_efectivo, 'Venta POS #' . $venta->id . ' (Parte Efectivo)');
                 }
                 if ($request->monto_digital > 0) {
                     CajaMovimiento::create([
@@ -392,6 +399,9 @@ class PosController extends Controller
                         'pedido_id'      => null,
                         'fecha'          => now()->toDateString(),
                     ]);
+
+                    // INYECCIÓN CENTRAL DE TESORERÍA
+                    $this->inyectarMovimientoTesoreria($request->metodo_digital, $request->monto_digital, 'Venta POS #' . $venta->id . ' (Parte ' . ucfirst($request->metodo_digital) . ' Ref: ' . $request->referencia_digital . ')');
                 }
             }
 
@@ -603,6 +613,9 @@ class PosController extends Controller
                     'fecha'          => now()->toDateString(),
                 ]);
                 $primerMovimientoId = $movimiento->id;
+
+                // INYECCIÓN CENTRAL DE TESORERÍA
+                $this->inyectarMovimientoTesoreria($request->metodo_pago, $monto_pagado, $conceptoBase . ($request->referencia_pago ? ' (Ref: ' . $request->referencia_pago . ')' : ''), $pedido->id);
             } else {
                 // Distribución matemática exacta del pago mixto
                 $efectivoAbonado = $request->monto_efectivo;
@@ -623,6 +636,9 @@ class PosController extends Controller
                         'fecha'          => now()->toDateString(),
                     ]);
                     $primerMovimientoId = $movimientoEfectivo->id;
+
+                    // INYECCIÓN CENTRAL DE TESORERÍA
+                    $this->inyectarMovimientoTesoreria('efectivo', $efectivoAbonado, $conceptoBase . ' (Parte Efectivo)', $pedido->id);
                 }
 
                 if ($digitalAbonado > 0) {
@@ -638,6 +654,9 @@ class PosController extends Controller
                     if (!$primerMovimientoId) {
                         $primerMovimientoId = $movimientoDigital->id;
                     }
+
+                    // INYECCIÓN CENTRAL DE TESORERÍA
+                    $this->inyectarMovimientoTesoreria($request->metodo_digital, $digitalAbonado, $conceptoBase . ' (Parte ' . ucfirst($request->metodo_digital) . ' Ref: ' . $request->referencia_digital . ')', $pedido->id);
                 }
             }
 
@@ -798,23 +817,8 @@ class PosController extends Controller
             ]);
 
             // 2. Registrar el movimiento en la Tesorería (Caja Fuerte / Tesorería)
-            $cuentaTesoreria = CuentaFinanciera::where('nombre', 'Caja Fuerte / Tesorería')->first();
-            if (!$cuentaTesoreria) {
-                $cuentaTesoreria = CuentaFinanciera::where('tipo', 'efectivo')->first();
-            }
-
-            if ($cuentaTesoreria && $request->monto_a_retirar > 0) {
-                MovimientoTesoreria::create([
-                    'cuenta_id' => $cuentaTesoreria->id,
-                    'tipo' => 'ingreso',
-                    'monto' => $request->monto_a_retirar,
-                    'concepto' => "Corte de caja de " . ($sesion->usuario->name ?? 'Cajero') . " - " . now()->format('d/m/Y'),
-                    'referencia_modulo' => 'POS-Corte-Caja',
-                    'usuario_id' => Auth::id() ?? 1,
-                ]);
-
-                $cuentaTesoreria->increment('saldo_actual', $request->monto_a_retirar);
-            }
+            // Se omite la inyección duplicada de ingresos por retiro en cerrarCaja ya que
+            // los pagos en efectivo son registrados en tiempo real a la cuenta "Caja Fuerte / Tesorería".
 
             // 3. Registrar el egreso de la caja del POS (aislado por caja_sesion_id)
             if ($request->monto_a_retirar > 0) {
@@ -966,6 +970,44 @@ class PosController extends Controller
                 'success' => false,
                 'message' => $e->getMessage()
             ], 422);
+        }
+    }
+
+    private function inyectarMovimientoTesoreria($metodoPago, $monto, $concepto, $pedidoId = null)
+    {
+        $metodo = strtolower($metodoPago);
+        if ($metodo === 'efectivo') {
+            $cuenta = CuentaFinanciera::where('nombre', 'Caja Fuerte / Tesorería')->first();
+            if (!$cuenta) {
+                $cuenta = CuentaFinanciera::where('tipo', 'efectivo')->first();
+            }
+            if ($cuenta && $monto > 0) {
+                MovimientoTesoreria::create([
+                    'cuenta_id'         => $cuenta->id,
+                    'tipo'              => 'ingreso',
+                    'monto'             => $monto,
+                    'concepto'          => $concepto,
+                    'referencia_modulo' => $pedidoId ? 'POS-Pedido-Pago' : 'POS-Venta-Directa',
+                    'usuario_id'        => Auth::id() ?? 1,
+                ]);
+                $cuenta->increment('saldo_actual', $monto);
+            }
+        } elseif ($metodo === 'tarjeta' || $metodo === 'transferencia') {
+            $cuenta = CuentaFinanciera::where('nombre', 'Banco Principal')->first();
+            if (!$cuenta) {
+                $cuenta = CuentaFinanciera::where('tipo', 'banco')->first();
+            }
+            if ($cuenta && $monto > 0) {
+                MovimientoTesoreria::create([
+                    'cuenta_id'         => $cuenta->id,
+                    'tipo'              => 'ingreso',
+                    'monto'             => $monto,
+                    'concepto'          => $concepto,
+                    'referencia_modulo' => $pedidoId ? 'POS-Pedido-Pago' : 'POS-Venta-Directa',
+                    'usuario_id'        => Auth::id() ?? 1,
+                ]);
+                $cuenta->increment('saldo_actual', $monto);
+            }
         }
     }
 
