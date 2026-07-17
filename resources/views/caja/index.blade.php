@@ -44,9 +44,9 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- Tarjeta: Depósitos -->
         <div class="bg-white p-6 border border-neutral-100 rounded-2xl shadow-sm flex flex-col justify-between">
-            <h3 class="text-sm font-medium text-neutral-500">Total Depósitos (Periodo)</h3>
+            <h3 class="text-sm font-medium text-neutral-500">Total Depósitos (Hoy)</h3>
             <div class="mt-4 flex items-baseline gap-2">
-                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($totalIngresos ?? 0, 2) }}</span>
+                <span class="text-4xl font-bold text-neutral-900"> L.{{ number_format($totalIngresosHoy ?? 0, 2) }}</span>
             </div>
         </div>
 

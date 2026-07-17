@@ -14,9 +14,20 @@ class TesoreriaController extends Controller
     {
         $cuentas = CuentaFinanciera::all();
         
-        $capitalNeto = $cuentas->sum('saldo_actual');
-        $totalBancos = $cuentas->where('tipo', 'banco')->sum('saldo_actual');
-        $totalEfectivo = $cuentas->where('tipo', 'efectivo')->sum('saldo_actual');
+        // Sumar saldos mediante consultas limpias a la base de datos (evitando acumuladores en caliente)
+        $totalBancos = MovimientoTesoreria::whereHas('cuenta', function($q) {
+            $q->where('tipo', 'banco');
+        })->where('tipo', 'ingreso')->sum('monto') - MovimientoTesoreria::whereHas('cuenta', function($q) {
+            $q->where('tipo', 'banco');
+        })->where('tipo', 'egreso')->sum('monto');
+
+        $totalEfectivo = MovimientoTesoreria::whereHas('cuenta', function($q) {
+            $q->where('tipo', 'efectivo');
+        })->where('tipo', 'ingreso')->sum('monto') - MovimientoTesoreria::whereHas('cuenta', function($q) {
+            $q->where('tipo', 'efectivo');
+        })->where('tipo', 'egreso')->sum('monto');
+
+        $capitalNeto = $totalBancos + $totalEfectivo;
 
         $inicioMes = now()->startOfMonth();
         $finMes = now()->endOfMonth();

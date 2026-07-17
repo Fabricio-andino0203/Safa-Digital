@@ -47,6 +47,8 @@ class InventarioController extends Controller
             'extras.*.precio' => 'required|numeric|min:0',
         ]);
 
+        $validated['controlar_stock'] = $request->has('controlar_stock') ? filter_var($request->controlar_stock, FILTER_VALIDATE_BOOLEAN) : false;
+
         $producto = Producto::create($validated);
 
         if (!empty($request->extras)) {
@@ -77,6 +79,8 @@ class InventarioController extends Controller
             'extras.*.costo'  => 'required|numeric|min:0',
             'extras.*.precio' => 'required|numeric|min:0',
         ]);
+
+        $validated['controlar_stock'] = $request->has('controlar_stock') ? filter_var($request->controlar_stock, FILTER_VALIDATE_BOOLEAN) : false;
 
         $producto = Producto::findOrFail($id);
         $producto->update($validated);

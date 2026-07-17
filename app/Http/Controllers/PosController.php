@@ -817,8 +817,23 @@ class PosController extends Controller
             ]);
 
             // 2. Registrar el movimiento en la Tesorería (Caja Fuerte / Tesorería)
-            // Se omite la inyección duplicada de ingresos por retiro en cerrarCaja ya que
-            // los pagos en efectivo son registrados en tiempo real a la cuenta "Caja Fuerte / Tesorería".
+            $cuentaTesoreria = CuentaFinanciera::where('nombre', 'Caja Fuerte / Tesorería')->first();
+            if (!$cuentaTesoreria) {
+                $cuentaTesoreria = CuentaFinanciera::where('tipo', 'efectivo')->first();
+            }
+
+            if ($cuentaTesoreria && $request->monto_a_retirar > 0) {
+                MovimientoTesoreria::create([
+                    'cuenta_id' => $cuentaTesoreria->id,
+                    'tipo' => 'ingreso',
+                    'monto' => $request->monto_a_retirar,
+                    'concepto' => "Corte de caja de " . ($sesion->usuario->name ?? 'Cajero') . " - " . now()->format('d/m/Y'),
+                    'referencia_modulo' => 'POS-Corte-Caja',
+                    'usuario_id' => Auth::id() ?? 1,
+                ]);
+
+                $cuentaTesoreria->increment('saldo_actual', $request->monto_a_retirar);
+            }
 
             // 3. Registrar el egreso de la caja del POS (aislado por caja_sesion_id)
             if ($request->monto_a_retirar > 0) {
@@ -976,23 +991,7 @@ class PosController extends Controller
     private function inyectarMovimientoTesoreria($metodoPago, $monto, $concepto, $pedidoId = null)
     {
         $metodo = strtolower($metodoPago);
-        if ($metodo === 'efectivo') {
-            $cuenta = CuentaFinanciera::where('nombre', 'Caja Fuerte / Tesorería')->first();
-            if (!$cuenta) {
-                $cuenta = CuentaFinanciera::where('tipo', 'efectivo')->first();
-            }
-            if ($cuenta && $monto > 0) {
-                MovimientoTesoreria::create([
-                    'cuenta_id'         => $cuenta->id,
-                    'tipo'              => 'ingreso',
-                    'monto'             => $monto,
-                    'concepto'          => $concepto,
-                    'referencia_modulo' => $pedidoId ? 'POS-Pedido-Pago' : 'POS-Venta-Directa',
-                    'usuario_id'        => Auth::id() ?? 1,
-                ]);
-                $cuenta->increment('saldo_actual', $monto);
-            }
-        } elseif ($metodo === 'tarjeta' || $metodo === 'transferencia') {
+        if ($metodo === 'tarjeta' || $metodo === 'transferencia') {
             $cuenta = CuentaFinanciera::where('nombre', 'Banco Principal')->first();
             if (!$cuenta) {
                 $cuenta = CuentaFinanciera::where('tipo', 'banco')->first();

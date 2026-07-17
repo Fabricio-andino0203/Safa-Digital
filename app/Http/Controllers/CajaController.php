@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CajaMovimiento;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CajaController extends Controller
 {
@@ -25,22 +26,26 @@ class CajaController extends Controller
         $totalEgresos = $movimientosHoy->where('tipo', 'egreso')->sum('monto');
         $balance = $totalIngresos - $totalEgresos;
 
-        // Cálculos contables globales históricos
-        $todosMovimientos = CajaMovimiento::all();
+        // Cálculos contables globales históricos por consultas limpias de base de datos
+        $balanceEfectivo = CajaMovimiento::where('tipo', 'ingreso')
+            ->where(DB::raw('lower(referencia)'), 'efectivo')
+            ->sum('monto') - 
+            CajaMovimiento::where('tipo', 'egreso')
+            ->where(DB::raw('lower(referencia)'), 'efectivo')
+            ->sum('monto');
 
-        $balanceEfectivo = $todosMovimientos->filter(function($m) {
-            return $m->tipo === 'ingreso' && strtolower($m->referencia) === 'efectivo';
-        })->sum('monto') - $todosMovimientos->filter(function($m) {
-            return $m->tipo === 'egreso' && strtolower($m->referencia) === 'efectivo';
-        })->sum('monto');
+        $balanceBancos = CajaMovimiento::where('tipo', 'ingreso')
+            ->whereIn(DB::raw('lower(referencia)'), ['bancos', 'tarjeta', 'transferencia'])
+            ->sum('monto') - 
+            CajaMovimiento::where('tipo', 'egreso')
+            ->sum('monto');
 
-        $balanceBancos = $todosMovimientos->filter(function($m) {
-            return $m->tipo === 'ingreso' && in_array(strtolower($m->referencia), ['bancos', 'tarjeta', 'transferencia']);
-        })->sum('monto') - $todosMovimientos->filter(function($m) {
-            return $m->tipo === 'egreso';
-        })->sum('monto');
+        // Total Depósitos (Hoy)
+        $totalIngresosHoy = CajaMovimiento::where('tipo', 'ingreso')
+            ->whereDate('fecha', now()->toDateString())
+            ->sum('monto');
 
-        return view('caja.index', compact('movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance', 'balanceEfectivo', 'balanceBancos', 'fechaInicio', 'fechaFin'));
+        return view('caja.index', compact('movimientosHoy', 'totalIngresos', 'totalEgresos', 'balance', 'balanceEfectivo', 'balanceBancos', 'totalIngresosHoy', 'fechaInicio', 'fechaFin'));
     }
 
     /**
