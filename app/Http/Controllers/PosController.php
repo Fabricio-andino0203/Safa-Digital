@@ -105,7 +105,69 @@ class PosController extends Controller
             $dineroEsperado = $totales['total_esperado'];
         }
 
-        return view('pos.index', compact('sesion', 'productos', 'pedidosPendientes', 'clientes', 'dineroEsperado', 'fondoSugerido'));
+        // ── Interceptar transferencia desde la Calculadora (Query Parameter Directo) ──
+        $itemCalculadora = null;
+        if (request()->filled('from_calculadora')) {
+            $draft = [
+                'material'        => request('tipo_material', 'impreso'),
+                'ancho'           => request('ancho'),
+                'alto'            => request('alto'),
+                'unidad'          => request('unidad', 'cm'),
+                'cantidad'        => (int) request('cantidad', 1),
+                'precio_unitario' => (float) request('precio_unitario'),
+                'costo_total'     => (float) request('costo_produccion_total'),
+            ];
+
+            $tipoMat = ucfirst(str_replace('_', ' ', $draft['material']));
+            $ancho = $draft['ancho'];
+            $alto = $draft['alto'];
+            $unidad = $draft['unidad'] ?? 'cm';
+            $cantidad = (int) ($draft['cantidad'] ?? 1);
+            $precioUnitario = (float) ($draft['precio_unitario'] ?? 0);
+            $costoTotal = (float) ($draft['costo_total'] ?? 0);
+            $costoUnitario = $cantidad > 0 ? $costoTotal / $cantidad : $costoTotal;
+
+            $productoMaquila = Producto::firstOrCreate(
+                ['nombre' => 'Servicios a Medida (Stickers / Maquila)'],
+                [
+                    'controlar_stock' => false,
+                    'activo'          => true,
+                    'categoria_id'    => null,
+                ]
+            );
+
+            $varianteMaquila = ProductoVariante::firstOrCreate(
+                ['sku' => 'MEDIDA-GENERICA'],
+                [
+                    'producto_id'     => $productoMaquila->id,
+                    'precio'          => 0.00,
+                    'costo'           => 0.00,
+                    'activo'          => true,
+                    'stock_fisico'    => 999999,
+                    'stock_reservado' => 0,
+                ]
+            );
+
+            $nombreCustom = "Trabajo a Medida — {$tipoMat} ({$ancho}x{$alto} {$unidad})";
+
+            $itemCalculadora = [
+                'cartLineKey'     => 'calc_' . time(),
+                'varianteId'      => $varianteMaquila->id,
+                'productoId'      => $productoMaquila->id,
+                'nombre'          => $nombreCustom,
+                'custom_nombre'   => $nombreCustom,
+                'sku'             => 'MEDIDA-GENERICA',
+                'precio'          => $precioUnitario,
+                'custom_precio'   => $precioUnitario,
+                'costo'           => $costoUnitario,
+                'custom_costo'    => $costoUnitario,
+                'qty'             => $cantidad,
+                'stockDisponible' => 999999,
+                'extras'          => [],
+            ];
+        }
+
+        return view('pos.index', compact('sesion', 'productos', 'pedidosPendientes', 'clientes', 'dineroEsperado', 'fondoSugerido', 'itemCalculadora'));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -262,19 +324,21 @@ class PosController extends Controller
                     }
                 }
 
-                $precioTotal = $variante->precio + $extrasPrice;
-                // Costo acumulativo: costo base de la variante + costos de los extras (Tarea 1)
-                $costoTotalUnitario = floatval($variante->costo ?? 0.00) + $extrasCost;
+                $precioTotal = isset($item['custom_precio']) ? floatval($item['custom_precio']) : (isset($item['precio']) ? floatval($item['precio']) : ($variante->precio + $extrasPrice));
+                $costoTotalUnitario = isset($item['custom_costo']) ? floatval($item['custom_costo']) : (isset($item['costo']) ? floatval($item['costo']) : (floatval($variante->costo ?? 0.00) + $extrasCost));
+                $customNombre = $item['custom_nombre'] ?? $item['nombre'] ?? null;
+
                 $linea     = $precioTotal * $item['qty'];
                 $subtotal += $linea;
 
                 $itemsValidos[] = [
-                    'variante' => $variante,
-                    'cantidad' => $item['qty'],
-                    'precio'   => (float) $precioTotal,
-                    'costo'    => (float) $costoTotalUnitario,
-                    'linea'    => $linea,
-                    'extras'   => $extrasSnap,
+                    'variante'      => $variante,
+                    'cantidad'      => $item['qty'],
+                    'precio'        => (float) $precioTotal,
+                    'costo'         => (float) $costoTotalUnitario,
+                    'linea'         => $linea,
+                    'extras'        => $extrasSnap,
+                    'custom_nombre' => $customNombre,
                 ];
             }
 
@@ -328,7 +392,7 @@ class PosController extends Controller
             // ── 3. Crear detalles y descontar stock ───────────────────────────
             foreach ($itemsValidos as $item) {
                 // Generar nombre de la variante concatenando los extras para visualización en ticket y reportes
-                $nombreSnapshot = $item['variante']->nombre_completo;
+                $nombreSnapshot = !empty($item['custom_nombre']) ? $item['custom_nombre'] : $item['variante']->nombre_completo;
                 if (!empty($item['extras'])) {
                     $partesExtras = [];
                     foreach ($item['extras'] as $ex) {

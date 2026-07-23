@@ -15,6 +15,7 @@ class CompraDetalle extends Model
     protected $fillable = [
         'compra_id',
         'producto_variante_id',
+        'nombre_snapshot',
         'cantidad',
         'costo_unitario',
         'subtotal',

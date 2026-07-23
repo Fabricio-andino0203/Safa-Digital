@@ -219,6 +219,9 @@ class CotizacionController extends Controller
                     // Incrementar total gastado
                     $pedido->cliente->increment('total_gastado', $pedido->total_pedido);
 
+                    // Automatización de Maquila / Subcontratación
+                    \App\Services\MaquilaAutomationService::procesarPedido($pedido);
+
                     // 4. Vincular Pedido a Cotización
                     $cotizacion->update([
                         'estado' => 'Aceptada',

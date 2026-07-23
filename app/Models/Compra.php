@@ -15,22 +15,30 @@ class Compra extends Model
 
     protected $fillable = [
         'numero_orden',
+        'pedido_id',
         'proveedor_id',
         'fecha',
         'total',
         'estado',
         'notes', // compatible con notas
         'notas',
+        'extras',
     ];
 
     protected $casts = [
         'fecha' => 'date',
         'total' => 'decimal:2',
+        'extras' => 'array',
     ];
 
     public function proveedor(): BelongsTo
     {
         return $this->belongsTo(Proveedor::class, 'proveedor_id');
+    }
+
+    public function pedido(): BelongsTo
+    {
+        return $this->belongsTo(Pedido::class, 'pedido_id');
     }
 
     public function detalles(): HasMany

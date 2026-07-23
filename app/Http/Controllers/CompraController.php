@@ -114,7 +114,10 @@ class CompraController extends Controller
             'detalles' => 'required|array|min:1',
             'detalles.*.id' => 'required|exists:compra_detalles,id',
             'detalles.*.costo_proveedor' => 'required|numeric|min:0',
-            'detalles.*.costo_extra' => 'required|numeric|min:0',
+            'detalles.*.costo_extra' => 'nullable|numeric|min:0',
+            'extras' => 'nullable|array',
+            'extras.*.concepto' => 'nullable|string',
+            'extras.*.costo' => 'nullable|numeric|min:0',
         ]);
 
         DB::beginTransaction();
@@ -123,24 +126,41 @@ class CompraController extends Controller
             foreach ($request->detalles as $det) {
                 $detalle = CompraDetalle::findOrFail($det['id']);
                 $costoProveedor = floatval($det['costo_proveedor']);
-                $costoExtra = floatval($det['costo_extra']);
+                $costoExtra = floatval($det['costo_extra'] ?? 0);
                 $costoTotal = $costoProveedor + $costoExtra;
 
-                $subtotal = $detalle->cantidad * $costoProveedor;
+                $subtotal = ($detalle->cantidad * $costoProveedor) + ($detalle->cantidad * $costoExtra);
                 $total += $subtotal;
 
                 $detalle->update([
                     'costo_proveedor' => $costoProveedor,
                     'costo_extra'     => $costoExtra,
                     'costo_total'     => $costoTotal,
-                    'costo_unitario'  => $costoProveedor, // para compatibilidad
-                    'subtotal'        => $subtotal,       // para compatibilidad
+                    'costo_unitario'  => $costoProveedor,
+                    'subtotal'        => $subtotal,
                 ]);
             }
 
+            // Procesar extras generales (Flete, Ojitos, Refuerzos, etc.)
+            $extrasList = [];
+            if (!empty($request->extras) && is_array($request->extras)) {
+                foreach ($request->extras as $ex) {
+                    $montoEx = floatval($ex['costo'] ?? 0);
+                    $conceptoEx = trim($ex['concepto'] ?? '');
+                    if (!empty($conceptoEx) && $montoEx > 0) {
+                        $extrasList[] = [
+                            'concepto' => $conceptoEx,
+                            'costo'    => $montoEx,
+                        ];
+                        $total += $montoEx;
+                    }
+                }
+            }
+
             $compra->update([
-                'total' => $total,
+                'total'  => $total,
                 'estado' => 'Valorizada',
+                'extras' => $extrasList,
             ]);
 
             DB::commit();

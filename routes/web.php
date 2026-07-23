@@ -118,6 +118,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permiso:inventario')->group(function () {
         Route::get('/calculadora-stickers', [CalculadoraController::class, 'index'])->name('calculadora.index');
         Route::get('/admin/calculadora-stickers', [CalculadoraController::class, 'index']);
+        Route::post('/calculadora-stickers/configuracion', [CalculadoraController::class, 'guardarConfiguracion'])->name('calculadora.configuracion');
+        Route::post('/calculadora-stickers/enviar-a-pedido', [CalculadoraController::class, 'enviarAPedido'])->name('calculadora.enviarAPedido');
     });
 
     // ─── POS (Punto de Venta) ─────────────────────────────────────────────────────

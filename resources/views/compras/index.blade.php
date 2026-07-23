@@ -128,21 +128,33 @@
         ).slice(0, 5);
     },
 
+    compraAValorar: null,
+    detallesAValorar: [],
+    extrasAValorar: [],
+    agregarExtraValorar() {
+        this.extrasAValorar.push({ concepto: '', costo: 0.00 });
+    },
+    removerExtraValorar(index) {
+        this.extrasAValorar.splice(index, 1);
+    },
     abrirValorar(compra) {
         this.compraAValorar = compra;
+        this.extrasAValorar = (compra.extras && Array.isArray(compra.extras)) 
+            ? compra.extras.map(e => ({ concepto: e.concepto || '', costo: Number(e.costo || 0) })) 
+            : [];
         this.detallesAValorar = compra.detalles.map(d => {
-            let nombreProducto = d.variante?.producto?.nombre || 'Producto';
+            let nombreProducto = d.nombre_snapshot || d.variante?.producto?.nombre || 'Item Maquila';
             let atributosStr = '';
-            if (d.variante?.attributes && Object.keys(d.variante.attributes).length > 0) {
-                atributosStr = ' — ' + Object.values(d.variante.attributes).join(' / ');
+            if (d.variante?.atributos && Object.keys(d.variante.atributos).length > 0) {
+                atributosStr = ' — ' + Object.values(d.variante.atributos).join(' / ');
             }
             return {
                 id: d.id,
                 nombre_completo: nombreProducto + atributosStr,
-                sku: d.variante?.sku || '',
+                sku: d.variante?.sku || 'MAQUILA',
                 cantidad: d.cantidad,
-                costo_proveedor: Number(d.variante?.costo || 0.00),
-                costo_extra: 0.00
+                costo_proveedor: Number(d.costo_proveedor || d.variante?.costo || 0.00),
+                costo_extra: Number(d.costo_extra || 0.00)
             };
         });
         this.modalValorar = true;
@@ -215,7 +227,14 @@
                 <tbody class="divide-y divide-neutral-100 text-sm text-neutral-700">
                     @forelse($compras as $compra)
                     <tr class="hover:bg-neutral-50/40 transition-colors">
-                        <td class="px-6 py-4 font-bold text-neutral-900">{{ $compra->numero_orden }}</td>
+                        <td class="px-6 py-4 font-mono font-bold text-neutral-900">
+                            {{ $compra->numero_orden }}
+                            @if($compra->pedido)
+                                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                    Maquila #{{ $compra->pedido->numero_orden }}
+                                </span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4">
                             <span class="font-bold text-neutral-900">{{ $compra->proveedor->nombre }}</span>
                             @if($compra->proveedor->empresa)
@@ -575,13 +594,45 @@
                                                        class="w-28 rounded-lg border border-gray-200 bg-gray-50/50 px-2 py-1 text-sm text-center text-gray-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-900 font-bold">
                                             </td>
                                             <td class="px-4 py-3 text-right">
-                                                <input type="number" step="0.01" readonly :value="(Number(d.costo_proveedor || 0) + Number(d.costo_extra || 0)).toFixed(2)"
+                                                <input type="number" step="0.01" readonly :value="((Number(d.costo_proveedor || 0) + Number(d.costo_extra || 0)) * d.cantidad).toFixed(2)"
                                                        class="w-28 rounded-lg border border-neutral-200 bg-neutral-100 px-2 py-1 text-sm text-center text-neutral-600 focus:outline-none font-bold ml-auto">
                                             </td>
                                         </tr>
                                     </template>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Sección de Ítems Extra de la Orden (Flete, Ojitos, Refuerzos, etc.) -->
+                        <div class="space-y-3 pt-2">
+                            <div class="flex items-center justify-between">
+                                <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider">Ítems Extra de la Orden (Flete, Ojitos, Refuerzos, etc.)</label>
+                                <button type="button" @click="agregarExtraValorar()" class="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1">
+                                    + Agregar Línea Extra
+                                </button>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <template x-for="(ex, exIndex) in extrasAValorar" :key="exIndex">
+                                    <div class="flex items-center gap-3 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200">
+                                        <input type="text" :name="'extras['+exIndex+'][concepto]'" x-model="ex.concepto" placeholder="Ej. Flete, Ojitos, Refuerzos..." required
+                                               class="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-800 focus:outline-none font-bold">
+                                        <div class="relative w-36">
+                                            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 text-xs font-bold">L.</span>
+                                            <input type="number" step="0.01" min="0" :name="'extras['+exIndex+'][costo]'" x-model.number="ex.costo" placeholder="0.00" required
+                                                   class="w-full pl-7 pr-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs text-right text-gray-800 focus:outline-none font-bold">
+                                        </div>
+                                        <button type="button" @click="removerExtraValorar(exIndex)" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 font-bold text-sm">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </template>
+                                <template x-if="extrasAValorar.length === 0">
+                                    <div class="p-3 bg-neutral-50 rounded-xl border border-dashed border-neutral-200 text-center text-xs text-neutral-400">
+                                        Sin extras agregados. Haz clic en "+ Agregar Línea Extra" para incluir Flete, Ojitos o Refuerzos.
+                                    </div>
+                                </template>
+                            </div>
                         </div>
 
                         <div class="pt-4 flex justify-end gap-3 border-t border-neutral-100">

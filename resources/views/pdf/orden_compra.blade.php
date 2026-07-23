@@ -119,12 +119,18 @@
         <tr>
             <td width="50%" valign="top" style="padding-right: 20px;">
                 <div class="info-title">Proveedor</div>
-                <div class="font-bold" style="font-size: 13px; color: #111111;">{{ $compra->proveedor->nombre }}</div>
-                @if($compra->proveedor->empresa)
-                    <div style="color: #555555; margin-top: 2px;">Empresa: {{ $compra->proveedor->empresa }}</div>
-                @endif
-                @if($compra->proveedor->telefono)
-                    <div style="color: #555555;">Teléfono: {{ $compra->proveedor->telefono }}</div>
+                @if($compra->proveedor)
+                    <div class="font-bold" style="font-size: 13px; color: #111111;">
+                        {{ $compra->proveedor->empresa ?? $compra->proveedor->nombre }}
+                    </div>
+                    @if($compra->proveedor->empresa && $compra->proveedor->nombre && $compra->proveedor->empresa !== $compra->proveedor->nombre)
+                        <div style="color: #555555; margin-top: 2px;">Contacto: {{ $compra->proveedor->nombre }}</div>
+                    @endif
+                    @if($compra->proveedor->telefono)
+                        <div style="color: #555555;">Teléfono: {{ $compra->proveedor->telefono }}</div>
+                    @endif
+                @else
+                    <div class="font-bold" style="font-size: 13px; color: #111111;">Proveedor No Asignado</div>
                 @endif
             </td>
             <td width="50%" valign="top">
@@ -140,15 +146,10 @@
     <table class="details-table" cellpadding="0" cellspacing="0">
         <thead>
             <tr>
-                @if($compra->estado === 'Solicitada')
-                    <th width="20%" class="text-center">Cant</th>
-                    <th width="80%">Descripción</th>
-                @else
-                    <th width="10%" class="text-center">Cant</th>
-                    <th width="50%">Descripción</th>
-                    <th width="20%" class="text-right">Costo Unit.</th>
-                    <th width="20%" class="text-right">Importe</th>
-                @endif
+                <th width="10%" class="text-center">Cant</th>
+                <th width="50%">Descripción</th>
+                <th width="20%" class="text-right">Costo Unit.</th>
+                <th width="20%" class="text-right">Importe</th>
             </tr>
         </thead>
         <tbody>
@@ -156,31 +157,53 @@
                 <tr>
                     <td class="text-center font-bold" style="color: #111111;">{{ $det->cantidad }}</td>
                     <td>
-                        <span class="font-bold" style="color: #111111;">{{ $det->variante->producto->nombre }}</span>
-                        @if(!empty($det->variante->atributos))
-                            <div style="font-size: 10px; color: #666666; margin-top: 2px;">
-                                SKU: {{ $det->variante->sku }} |
-                                {{ implode(' / ', array_values($det->variante->atributos)) }}
-                            </div>
+                        @if($det->variante && $det->variante->producto)
+                            <span class="font-bold" style="color: #111111;">{{ $det->variante->producto->nombre }}</span>
+                            @if(!empty($det->variante->atributos))
+                                <div style="font-size: 10px; color: #666666; margin-top: 2px;">
+                                    SKU: {{ $det->variante->sku }} |
+                                    {{ implode(' / ', array_values($det->variante->atributos)) }}
+                                </div>
+                            @elseif($det->variante->sku)
+                                <div style="font-size: 10px; color: #666666; margin-top: 2px;">
+                                    SKU: {{ $det->variante->sku }}
+                                </div>
+                            @endif
                         @else
-                            <div style="font-size: 10px; color: #666666; margin-top: 2px;">
-                                SKU: {{ $det->variante->sku }}
-                            </div>
+                            <span class="font-bold" style="color: #111111;">{{ $det->nombre_snapshot ?? $det->descripcion ?? 'Trabajo a Medida' }}</span>
                         @endif
                     </td>
-                    @if($compra->estado !== 'Solicitada')
-                        <td class="text-right">L. {{ number_format($det->costo_unitario, 2) }}</td>
-                        <td class="text-right font-bold" style="color: #111111;">L. {{ number_format($det->subtotal, 2) }}</td>
-                    @endif
+                    <td class="text-right">L. {{ number_format($det->costo_unitario, 2) }}</td>
+                    <td class="text-right font-bold" style="color: #111111;">L. {{ number_format($det->subtotal ?? ($det->cantidad * $det->costo_unitario), 2) }}</td>
                 </tr>
             @endforeach
-            @if($compra->estado !== 'Solicitada')
-                <tr class="total-row">
-                    <td colspan="2"></td>
-                    <td class="text-right font-bold" style="font-size: 12px; text-transform: uppercase;">Total</td>
-                    <td class="text-right font-bold" style="color: #111111;">L. {{ number_format($compra->total, 2) }}</td>
-                </tr>
+
+            <!-- Desglose de Costos Extras (Fletes, Ojitos, Refuerzos, etc.) -->
+            @if(!empty($compra->extras) && (is_array($compra->extras) || is_object($compra->extras)))
+                @foreach($compra->extras as $extra)
+                    @php
+                        $nombreExtra = is_array($extra) ? ($extra['concepto'] ?? $extra['descripcion'] ?? $extra['nombre'] ?? 'Extra') : ($extra->concepto ?? $extra->descripcion ?? $extra->nombre ?? 'Extra');
+                        $montoExtra = is_array($extra) ? floatval($extra['costo'] ?? $extra['monto'] ?? 0) : floatval($extra->costo ?? $extra->monto ?? 0);
+                    @endphp
+                    @if($montoExtra > 0 || !empty($nombreExtra))
+                        <tr>
+                            <td class="text-center font-bold" style="color: #666666;">1</td>
+                            <td>
+                                <span class="font-bold" style="color: #444444;">Extra: {{ $nombreExtra }}</span>
+                            </td>
+                            <td class="text-right" style="color: #666666;">L. {{ number_format($montoExtra, 2) }}</td>
+                            <td class="text-right font-bold" style="color: #111111;">L. {{ number_format($montoExtra, 2) }}</td>
+                        </tr>
+                    @endif
+                @endforeach
             @endif
+
+            <!-- Resumen Total Global -->
+            <tr class="total-row">
+                <td colspan="2"></td>
+                <td class="text-right font-bold" style="font-size: 12px; text-transform: uppercase;">Total</td>
+                <td class="text-right font-bold" style="color: #111111; font-size: 14px;">L. {{ number_format($compra->total, 2) }}</td>
+            </tr>
         </tbody>
     </table>
 

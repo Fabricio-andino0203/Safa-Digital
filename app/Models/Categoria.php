@@ -17,6 +17,11 @@ class Categoria extends Model
         'nombre',
         'icono',
         'descripcion',
+        'es_subcontratado',
+    ];
+
+    protected $casts = [
+        'es_subcontratado' => 'boolean',
     ];
 
     // ──────────────────────────────────────────────────────────────────────────

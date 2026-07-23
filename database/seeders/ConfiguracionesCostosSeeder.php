@@ -4,24 +4,16 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Configuracion;
+use Illuminate\Support\Facades\Cache;
 
-class ConfiguracionSeeder extends Seeder
+class ConfiguracionesCostosSeeder extends Seeder
 {
-    public function run()
+    /**
+     * Inyecta las variables globales de costeo de la Calculadora Comercial.
+     */
+    public function run(): void
     {
-        $configs = [
-            // Empresa
-            ['grupo' => 'empresa', 'llave' => 'nombre_comercial', 'valor' => 'Safa Digital', 'tipo' => 'texto'],
-            ['grupo' => 'empresa', 'llave' => 'razon_social', 'valor' => 'Inversiones Solucels', 'tipo' => 'texto'],
-            ['grupo' => 'empresa', 'llave' => 'telefono', 'valor' => '+504 0000-0000', 'tipo' => 'texto'],
-            ['grupo' => 'empresa', 'llave' => 'direccion', 'valor' => 'Dirección de la empresa', 'tipo' => 'texto'],
-            ['grupo' => 'empresa', 'llave' => 'logo_ruta', 'valor' => 'images/logo.png', 'tipo' => 'imagen'],
-            
-            // Tickets y PDFs
-            ['grupo' => 'ticket', 'llave' => 'ticket_mensaje_pie', 'valor' => 'Gracias por su preferencia.', 'tipo' => 'texto'],
-            ['grupo' => 'ticket', 'llave' => 'terminos_cotizacion', 'valor' => 'Cotización válida por 15 días.', 'tipo' => 'texto'],
-
-            // Calculadora de Stickers y Corte
+        $costos = [
             ['grupo' => 'calculadora', 'llave' => 'calc_costo_yarda', 'valor' => '150', 'tipo' => 'numero'],
             ['grupo' => 'calculadora', 'llave' => 'calc_costo_pulgada_cuadrada', 'valor' => '0.08', 'tipo' => 'numero'],
             ['grupo' => 'calculadora', 'llave' => 'calc_costo_banner_in2', 'valor' => '0.05', 'tipo' => 'numero'],
@@ -33,11 +25,12 @@ class ConfiguracionSeeder extends Seeder
             ['grupo' => 'calculadora', 'llave' => 'calc_margen_ganancia_default', 'valor' => '50', 'tipo' => 'numero'],
         ];
 
-        foreach ($configs as $config) {
+        foreach ($costos as $costo) {
             Configuracion::updateOrCreate(
-                ['llave' => $config['llave']],
-                $config
+                ['llave' => $costo['llave']],
+                $costo
             );
+            Cache::forget('configuracion_' . $costo['llave']);
         }
     }
 }

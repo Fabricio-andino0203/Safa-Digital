@@ -18,7 +18,15 @@ class PedidoController extends Controller
         $pedidos = Pedido::with(['cliente', 'detalles.variante.producto', 'archivos'])->get()->groupBy('estado');
         $plantillas = \App\Models\MensajePlantilla::where('activa', true)->get();
         $cajaAbierta = \App\Models\CajaSesion::sesionAbierta() !== null;
-        return view('pedidos.index', compact('pedidos', 'plantillas', 'cajaAbierta'));
+
+        // ── Intercepción de borrador desde la Calculadora Comercial (Session Handoff) ─
+        $draftCalculadora = null;
+        if (session()->has('draft_calculadora')) {
+            $draftCalculadora = session('draft_calculadora');
+            session()->forget('draft_calculadora');
+        }
+
+        return view('pedidos.index', compact('pedidos', 'plantillas', 'cajaAbierta', 'draftCalculadora'));
     }
 
     public function store(Request $request)
@@ -126,13 +134,19 @@ class PedidoController extends Controller
 
             // ── Detalles + Reserva de stock ────────────────────────────────────
             foreach ($validated['detalles'] as $item) {
+                $costoUnitario = 0;
+                if (isset($item['costo_unitario']) && is_numeric($item['costo_unitario'])) {
+                    $costoUnitario = floatval($item['costo_unitario']);
+                }
+
                 $detalleData = [
-                    'pedido_id'     => $pedido->id,
-                    'tipo_producto' => $item['tipo_producto'],
-                    'cantidad'      => $item['cantidad'],
-                    'precio_venta'  => $item['precio_venta'],
-                    'subtotal'      => $item['cantidad'] * $item['precio_venta'],
-                    'extras'        => $item['extras'] ?? null,
+                    'pedido_id'      => $pedido->id,
+                    'tipo_producto'  => $item['tipo_producto'],
+                    'cantidad'       => $item['cantidad'],
+                    'precio_venta'   => $item['precio_venta'],
+                    'costo_unitario' => $costoUnitario,
+                    'subtotal'       => $item['cantidad'] * $item['precio_venta'],
+                    'extras'         => $item['extras'] ?? null,
                 ];
 
                 if ($item['tipo_producto'] === 'Inventario') {
@@ -157,10 +171,13 @@ class PedidoController extends Controller
                     $detalleData['nombre_snapshot']      = $nombreSnapshot;
                     $detalleData['sku_snapshot']         = $variante->sku;
                     $detalleData['precio_unitario']      = $variante->precio;
+                    if ($costoUnitario <= 0) {
+                        $detalleData['costo_unitario']   = floatval($variante->costo ?? 0);
+                    }
                 } else {
                     $detalleData['nombre_libre']      = $item['nombre_libre'];
                     $detalleData['descripcion_libre'] = $item['descripcion_libre'] ?? null;
-                    $detalleData['precio_unitario']   = $item['precio_venta']; // Coste no rastreado
+                    $detalleData['precio_unitario']   = $item['precio_venta'];
                 }
 
                 PedidoDetalle::create($detalleData);
@@ -195,6 +212,13 @@ class PedidoController extends Controller
 
             // ── Total gastado del cliente ──────────────────────────────────────
             $pedido->cliente->increment('total_gastado', $validated['total_pedido']);
+
+            // ── Automatización de Maquila / Subcontratación ─────────────────────
+            try {
+                \App\Services\MaquilaAutomationService::procesarPedido($pedido);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Error en automatización de maquila: ' . $e->getMessage());
+            }
 
             DB::commit();
 

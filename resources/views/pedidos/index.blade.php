@@ -851,6 +851,7 @@
 <script>
     function kanbanBoard() {
         return {
+            draftCalculadora: @json($draftCalculadora),
             init() {
                 const urlParams = new URLSearchParams(window.location.search);
                 const pedidoId = urlParams.get('id');
@@ -863,6 +864,40 @@
                     setTimeout(() => {
                         this.openModal();
                     }, 200);
+                }
+
+                if (this.draftCalculadora) {
+                    setTimeout(() => {
+                        this.openModal();
+                        this.iniciarDetalleCalculadora(this.draftCalculadora);
+                    }, 300);
+                }
+            },
+            
+            iniciarDetalleCalculadora(draft) {
+                const tipoMat = (draft.material || 'impreso').toUpperCase().replace('_', ' ');
+                const nombreItem = `Trabajo a Medida - ${tipoMat}`;
+                const descrip = `Medidas: ${draft.ancho} x ${draft.alto} ${draft.unidad || 'cm'}. Cantidad: ${draft.cantidad} uds.`;
+                const cant = parseInt(draft.cantidad || 1);
+                const totalCosto = parseFloat(draft.costo_total || 0);
+                const costoUnitario = cant > 0 ? (totalCosto / cant) : 0;
+
+                this.form.detalles = [
+                    {
+                        tipo_producto: 'Libre',
+                        producto_variante_id: '',
+                        nombre_libre: nombreItem,
+                        descripcion_libre: descrip,
+                        cantidad: cant,
+                        precio_venta: parseFloat(draft.precio_unitario || 0),
+                        costo_unitario: Number(costoUnitario.toFixed(2)),
+                        extras: [
+                            { nombre: 'Costo Producción', costo_unitario: Number(costoUnitario.toFixed(2)), costo_total: Number(totalCosto.toFixed(2)) }
+                        ]
+                    }
+                ];
+                if (draft.material === 'banner') {
+                    this.form.notas = "Trabajo de Lona / Banner con flete de transporte incluido.";
                 }
             },
             filtroActual: 'todos',

@@ -972,9 +972,19 @@ function posApp() {
         productoParaExtras:  null,
         extrasSeleccionados: [],
 
+        // Item transferido desde la Calculadora Comercial
+        itemCalculadora: @json($itemCalculadora),
+
         // Carrito — items: { varianteId, productoId, nombre, sku, precio, stockDisponible, qty }
         carrito:  [],
         descuento: 0,
+
+        init() {
+            this.filtrados = this.todos;
+            if (this.itemCalculadora) {
+                this.carrito.push(this.itemCalculadora);
+            }
+        },
 
         // Cobro
         openCobro:      false,
@@ -1226,7 +1236,7 @@ function posApp() {
                     },
                     body: JSON.stringify({
                         caja_sesion_id:  this.sesionId,
-                        carrito:         this.carrito.map(i => ({ id: i.varianteId, qty: i.qty, extras: i.extras })),
+                        carrito:         this.carrito.map(i => ({ id: i.varianteId, qty: i.qty, extras: i.extras, custom_precio: i.custom_precio, custom_costo: i.custom_costo, custom_nombre: i.custom_nombre })),
                         descuento:       this.descuento || 0,
                         metodo_pago:     this.metodoPago,
                         monto_entregado: this.metodoPago === 'efectivo' ? this.montoEntregado : null,
