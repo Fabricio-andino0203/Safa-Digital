@@ -11,6 +11,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TesoreriaController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\CalculadoraController;
 
 /*
 |--------------------------------------------------------------------------
@@ -111,6 +112,12 @@ Route::middleware('auth')->group(function () {
         // AJAX: SKU sugerido y subida de imágenes
         Route::get('/sku-sugerido', [InventarioController::class, 'skuSugerido'])->name('skuSugerido');
         Route::post('/upload-imagen', [InventarioController::class, 'uploadImagen'])->name('uploadImagen');
+    });
+
+    // ─── Calculadora de Stickers y Corte ──────────────────────────────────────────
+    Route::middleware('permiso:inventario')->group(function () {
+        Route::get('/calculadora-stickers', [CalculadoraController::class, 'index'])->name('calculadora.index');
+        Route::get('/admin/calculadora-stickers', [CalculadoraController::class, 'index']);
     });
 
     // ─── POS (Punto de Venta) ─────────────────────────────────────────────────────
